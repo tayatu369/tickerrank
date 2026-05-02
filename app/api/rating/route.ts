@@ -529,6 +529,8 @@ async function runRatingModel(
           model: OPENROUTER_MODEL,
           messages,
           response_format: { type: "json_object" },
+          temperature: 0,
+          seed: 42,
         },
         { timeout: OPENAI_TIMEOUT_MS },
       );
@@ -663,10 +665,15 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    try {
-      await kvSetSafe(cacheKey, ratingData, { ex: 86400 });
-    } catch {
-      warnKvUnavailableOnce();
+    const kvStored = await kvSetSafe(cacheKey, ratingData, { ex: 86400 });
+    if (kvStored) {
+      console.log(
+        `[rating API] KV set succeeded key=${cacheKey} exSeconds=86400`,
+      );
+    } else {
+      console.error(
+        `[rating API] KV set failed key=${cacheKey} exSeconds=86400`,
+      );
     }
 
     return NextResponse.json(ratingData);
