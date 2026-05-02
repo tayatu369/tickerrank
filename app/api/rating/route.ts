@@ -10,6 +10,17 @@ import YahooFinance from 'yahoo-finance2';
 import type { Quote } from "yahoo-finance2/modules/quote";
 import type { QuoteSummaryResult } from "yahoo-finance2/modules/quoteSummary-iface";
 
+const SYMBOL_NOT_FOUND =
+  "Symbol not found. Please enter a valid US stock ticker.";
+const YAHOO_QUOTE_UNRECOGNIZED = "YAHOO_QUOTE_UNRECOGNIZED";
+
+class SymbolNotFoundError extends Error {
+  constructor(message = SYMBOL_NOT_FOUND) {
+    super(message);
+    this.name = "SymbolNotFoundError";
+  }
+}
+
 const OPENAI_TIMEOUT_MS = 25_000;
 const OPENROUTER_MODEL = "google/gemini-2.0-flash-001";
 
@@ -81,6 +92,28 @@ function validateSymbol(raw: string | null): string | null {
   const symbol = raw.trim().toUpperCase();
   if (!/^[A-Z]{1,10}$/.test(symbol)) return null;
   return symbol;
+}
+
+function yahooQuoteIndicatesRecognizedSymbol(
+  requestedUpper: string,
+  quote: Quote,
+): boolean {
+  const sym = String((quote as { symbol?: string }).symbol ?? "").toUpperCase();
+  if (sym && sym !== requestedUpper) return false;
+
+  const qt = String(quote.quoteType ?? "").toUpperCase();
+  if (qt === "NONE") return false;
+
+  const marketCap = num(quote.marketCap);
+  const bestPrice = Math.max(
+    num(quote.regularMarketPrice),
+    num(quote.regularMarketPreviousClose),
+    num(quote.postMarketPrice),
+    num((quote as { preMarketPrice?: number }).preMarketPrice),
+    num((quote as { bid?: number }).bid),
+    num((quote as { ask?: number }).ask),
+  );
+  return marketCap > 0 || bestPrice > 0;
 }
 
 function requireEnv(name: "OPENAI_API_KEY" | "FINNHUB_API_KEY"): string {
@@ -303,6 +336,10 @@ async function fetchFinnhubBundle(
       const msg = String(quoteJson.error ?? metricJson.error);
       console.error(`[rating API] Finnhub API error field: ${msg}`);
       throw new Error(msg);
+    }
+
+    if (num(quoteJson.c) <= 0 && num(quoteJson.pc) <= 0) {
+      throw new SymbolNotFoundError();
     }
 
     return {
@@ -568,16 +605,24 @@ export async function GET(request: NextRequest) {
 
     try {
       const yahooData = await fetchYahooBundle(symbol);
+      if (!yahooQuoteIndicatesRecognizedSymbol(symbol, yahooData.quote)) {
+        throw new Error(YAHOO_QUOTE_UNRECOGNIZED);
+      }
       companyName = yahooCompanyName(yahooData.quote, symbol);
       metrics = buildMetricsFromYahoo(yahooData);
     } catch (yahooErr) {
-      logError(
-        `Yahoo Finance failed for ${symbol}; switching data source to Finnhub`,
-        yahooErr,
-      );
-      console.error(
-        `[rating API] Fallback: using Finnhub for symbol=${symbol} (Yahoo error above)`,
-      );
+      const silentUnrecognized =
+        yahooErr instanceof Error &&
+        yahooErr.message === YAHOO_QUOTE_UNRECOGNIZED;
+      if (!silentUnrecognized) {
+        logError(
+          `Yahoo Finance failed for ${symbol}; switching data source to Finnhub`,
+          yahooErr,
+        );
+        console.error(
+          `[rating API] Fallback: using Finnhub for symbol=${symbol} (Yahoo error above)`,
+        );
+      }
       try {
         const finnhub = await fetchFinnhubBundle(symbol, finnhubApiKey);
         companyName = finnhub.companyName;
@@ -586,6 +631,9 @@ export async function GET(request: NextRequest) {
           `[rating API] Finnhub fallback succeeded for symbol=${symbol}`,
         );
       } catch (finnhubErr) {
+        if (finnhubErr instanceof SymbolNotFoundError) {
+          return NextResponse.json({ error: SYMBOL_NOT_FOUND }, { status: 400 });
+        }
         logError(
           `Finnhub fallback also failed for ${symbol} after Yahoo failure`,
           finnhubErr,
@@ -624,6 +672,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(ratingData);
   } catch (err) {
     logError("GET /api/rating unhandled failure", err);
+    if (err instanceof SymbolNotFoundError) {
+      return NextResponse.json({ error: SYMBOL_NOT_FOUND }, { status: 400 });
+    }
     return NextResponse.json({ error: "Failed to generate rating" }, { status: 500 });
   }
 }

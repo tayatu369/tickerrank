@@ -14,9 +14,9 @@ export const metadata: Metadata = {
   description:
     "Get an instant rating (A+ to F) on any US stock. Simple, clear, data-driven.",
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml", sizes: "any" }],
+    icon: "/icon.svg",
     shortcut: "/icon.svg",
-    apple: [{ url: "/icon.svg", sizes: "180x180" }],
+    apple: "/icon.svg",
   },
 };
 

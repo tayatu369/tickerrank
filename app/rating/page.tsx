@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { SignInButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
@@ -196,6 +196,26 @@ function NoSymbolPrompt() {
 
 type LockPrompt = "sign-in" | "upgrade";
 
+const lockedCtaClassName =
+  "pointer-events-auto font-semibold text-[#3B82F6] hover:underline";
+
+function LockedUpgradeCta({ lockPrompt }: { lockPrompt: LockPrompt }) {
+  if (lockPrompt === "sign-in") {
+    return (
+      <SignInButton mode="modal">
+        <button type="button" className={lockedCtaClassName}>
+          Sign in to upgrade
+        </button>
+      </SignInButton>
+    );
+  }
+  return (
+    <Link href="/pricing" className={lockedCtaClassName}>
+      Upgrade to Pro
+    </Link>
+  );
+}
+
 function LockedReason({ preview, lockPrompt }: { preview: string; lockPrompt: LockPrompt }) {
   return (
     <li className="relative overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] py-4 pl-4 pr-4">
@@ -207,12 +227,7 @@ function LockedReason({ preview, lockPrompt }: { preview: string; lockPrompt: Lo
           🔒
         </span>
         <span className="text-sm text-slate-300">
-          <Link
-            href="/pricing"
-            className="pointer-events-auto font-semibold text-[#3B82F6] hover:underline"
-          >
-            {lockPrompt === "sign-in" ? "Sign in to upgrade" : "Upgrade to Pro"}
-          </Link>
+          <LockedUpgradeCta lockPrompt={lockPrompt} />
         </span>
       </div>
     </li>
@@ -245,12 +260,7 @@ function LockedMetricBar({
           🔒
         </span>
         <span className="text-sm text-slate-300">
-          <Link
-            href="/pricing"
-            className="pointer-events-auto font-semibold text-[#3B82F6] hover:underline"
-          >
-            {lockPrompt === "sign-in" ? "Sign in to upgrade" : "Upgrade to Pro"}
-          </Link>
+          <LockedUpgradeCta lockPrompt={lockPrompt} />
         </span>
       </div>
     </li>
@@ -311,6 +321,7 @@ function RatingDetails({
   const [data, setData] = useState<RatingApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [symbolNotRecognized, setSymbolNotRecognized] = useState(false);
   const [simulatedProgress, setSimulatedProgress] = useState(0);
   const [loadingFireCount, setLoadingFireCount] = useState(0);
   const [showSlowTip, setShowSlowTip] = useState(false);
@@ -406,6 +417,7 @@ function RatingDetails({
       if (cancelled || !isMountedRef.current) return;
       setLoading(true);
       setError(false);
+      setSymbolNotRecognized(false);
       setData(null);
       try {
         const res = await fetch(
@@ -414,7 +426,11 @@ function RatingDetails({
         );
         if (cancelled || !isMountedRef.current) return;
         if (!res.ok) {
-          setError(true);
+          if (res.status === 400) {
+            setSymbolNotRecognized(true);
+          } else {
+            setError(true);
+          }
           return;
         }
         const json = (await res.json()) as RatingApiResponse | { error?: string };
@@ -463,6 +479,15 @@ function RatingDetails({
   return (
     <div className="rating-details-root min-w-0">
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+      {symbolNotRecognized ? (
+        <div
+          className="mb-8 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+          role="alert"
+        >
+          Symbol not recognized. Please check the ticker and try again.
+        </div>
+      ) : null}
+
       {error ? (
         <div
           className="mb-8 rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
