@@ -3,8 +3,10 @@
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { memo, startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { HomeAuthNav } from "../components/home-auth-nav";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { SiteFooter } from "../components/site-footer";
+import { SiteHeader } from "../components/site-header";
+import { recordRecentSymbol } from "@/lib/recent-queries";
 import { RatingHistoryChart } from "./rating-history-chart";
 
 type RatingApiResponse = {
@@ -144,38 +146,6 @@ function Spinner({ className = "" }: { className?: string }) {
     />
   );
 }
-
-const SiteHeader = memo(function SiteHeader() {
-  return (
-    <header className="border-b border-white/5 px-4 py-4 sm:px-6">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-lg font-semibold tracking-tight text-white"
-        >
-          <span
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3B82F6] text-sm font-bold text-white"
-            aria-hidden
-          >
-            TR
-          </span>
-          <span>TickerRank</span>
-        </Link>
-        <HomeAuthNav />
-      </div>
-    </header>
-  );
-});
-
-const SiteFooter = memo(function SiteFooter() {
-  return (
-    <footer className="mt-auto border-t border-white/5 px-4 py-6 sm:px-6">
-      <p className="mx-auto max-w-5xl text-center text-xs text-slate-500">
-        Not financial advice. NFA.
-      </p>
-    </footer>
-  );
-});
 
 function NoSymbolPrompt() {
   return (
@@ -388,10 +358,13 @@ function RatingDetails({
       return;
     }
 
-    setSimulatedProgress(0);
-    setLoadingFireCount(0);
-    setShowSlowTip(false);
-    setSlowTipQuote(null);
+    queueMicrotask(() => {
+      if (!isMountedRef.current) return;
+      setSimulatedProgress(0);
+      setLoadingFireCount(0);
+      setShowSlowTip(false);
+      setSlowTipQuote(null);
+    });
 
     let fires = 0;
     progressIntervalRef.current = setInterval(() => {
@@ -452,6 +425,7 @@ function RatingDetails({
         }
         successDeferred = true;
         setSimulatedProgress(100);
+        recordRecentSymbol(symbol);
         startTransition(() => {
           if (!isMountedRef.current) return;
           setData(json as RatingApiResponse);

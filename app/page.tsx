@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { HomeAuthNav } from "./components/home-auth-nav";
+import { SiteFooter } from "./components/site-footer";
+import { SiteHeader } from "./components/site-header";
 
 const features = [
   {
@@ -22,23 +22,7 @@ const features = [
 export default function Home() {
   return (
     <div className="flex min-h-full flex-1 flex-col bg-[#0B1120] text-slate-100">
-      <header className="border-b border-white/5 px-4 py-4 sm:px-6">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-lg font-semibold tracking-tight text-white"
-          >
-            <span
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3B82F6] text-sm font-bold text-white"
-              aria-hidden
-            >
-              TR
-            </span>
-            <span>TickerRank</span>
-          </Link>
-          <HomeAuthNav />
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="flex flex-1 flex-col px-4 pb-16 pt-12 sm:px-6 sm:pt-16 md:pt-20">
         <div className="mx-auto w-full max-w-3xl text-center">
@@ -107,11 +91,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="mt-auto border-t border-white/5 px-4 py-6 sm:px-6">
-        <p className="mx-auto max-w-5xl text-center text-xs text-slate-500">
-          Not financial advice. NFA.
-        </p>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

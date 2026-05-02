@@ -13,6 +13,11 @@ export const metadata: Metadata = {
   title: "TickerRank — AI-Powered Stock Rating System",
   description:
     "Get an instant rating (A+ to F) on any US stock. Simple, clear, data-driven.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml", sizes: "any" }],
+    shortcut: "/icon.svg",
+    apple: [{ url: "/icon.svg", sizes: "180x180" }],
+  },
 };
 
 export default function RootLayout({

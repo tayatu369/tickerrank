@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <title>TickerRank</title>
+  <rect width="32" height="32" rx="8" fill="#0B1120" />
+  <!-- Upward trend line -->
+  <path
+    d="M5 20 L11 14 L17 17 L27 7"
+    stroke="#3B82F6"
+    stroke-width="2.25"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <!-- Arrow head -->
+  <path
+    d="M23 7 H27 V11"
+    stroke="#3B82F6"
+    stroke-width="2.25"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <text
+    x="16"
+    y="26.25"
+    text-anchor="middle"
+    font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-size="9"
+    font-weight="800"
+    fill="#F1F5F9"
+    letter-spacing="-0.04em"
+  >
+    TR
+  </text>
+</svg>
