@@ -198,7 +198,23 @@ function NoSymbolPrompt() {
 type LockPrompt = "sign-in" | "upgrade";
 
 const lockedCtaClassName =
-  "pointer-events-auto font-semibold text-[#3B82F6] hover:underline";
+  "font-semibold text-[#3B82F6] hover:underline";
+
+function alertSignInError(err: unknown): void {
+  const msg = err instanceof Error ? err.message : String(err);
+  window.alert(`Sign-in could not open: ${msg}`);
+}
+
+function triggerSignIn(openSignIn: () => unknown): void {
+  try {
+    const result = openSignIn();
+    if (result != null && typeof (result as PromiseLike<unknown>).then === "function") {
+      void (result as PromiseLike<unknown>).then(undefined, alertSignInError);
+    }
+  } catch (err) {
+    alertSignInError(err);
+  }
+}
 
 function LockedUpgradeCta({ lockPrompt }: { lockPrompt: LockPrompt }) {
   const { openSignIn } = useClerk();
@@ -209,7 +225,7 @@ function LockedUpgradeCta({ lockPrompt }: { lockPrompt: LockPrompt }) {
       <button
         type="button"
         className={lockedCtaClassName}
-        onClick={() => openSignIn()}
+        onClick={() => triggerSignIn(openSignIn)}
       >
         Sign in to upgrade
       </button>
@@ -219,7 +235,13 @@ function LockedUpgradeCta({ lockPrompt }: { lockPrompt: LockPrompt }) {
     <button
       type="button"
       className={lockedCtaClassName}
-      onClick={() => router.push("/pricing")}
+      onClick={() => {
+        try {
+          router.push("/pricing");
+        } catch (err) {
+          alert(err instanceof Error ? err.message : String(err));
+        }
+      }}
     >
       Upgrade to Pro
     </button>
@@ -232,8 +254,8 @@ function LockedReason({ preview, lockPrompt }: { preview: string; lockPrompt: Lo
       <p className="select-none text-sm leading-relaxed text-slate-300 blur-sm">
         {preview}
       </p>
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-[#0B1120]/70 backdrop-blur-[2px]">
-        <span className="text-lg text-slate-400" aria-hidden>
+      <div className="absolute inset-0 flex items-center justify-center gap-2 bg-[#0B1120]/70 backdrop-blur-[2px]">
+        <span className="pointer-events-none text-lg text-slate-400" aria-hidden>
           🔒
         </span>
         <span className="text-sm text-slate-300">
@@ -265,8 +287,8 @@ function LockedMetricBar({
           <div className="h-full rounded-full bg-[#3B82F6]" style={{ width: w }} />
         </div>
       </div>
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-[#0B1120]/70 backdrop-blur-[2px]">
-        <span className="text-lg text-slate-400" aria-hidden>
+      <div className="absolute inset-0 flex items-center justify-center gap-2 bg-[#0B1120]/70 backdrop-blur-[2px]">
+        <span className="pointer-events-none text-lg text-slate-400" aria-hidden>
           🔒
         </span>
         <span className="text-sm text-slate-300">

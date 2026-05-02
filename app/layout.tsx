@@ -20,10 +20,10 @@ export const metadata: Metadata = {
   },
 };
 
-const clerkPublishableKey =
-  typeof process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY === "string"
-    ? process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.trim()
-    : "";
+/** Server-side read; inlined into the client bundle for NEXT_PUBLIC_* at build time. */
+const clerkPublishableKey = (
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? ""
+).trim();
 
 export default function RootLayout({
   children,

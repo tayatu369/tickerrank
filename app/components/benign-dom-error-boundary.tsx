@@ -1,6 +1,11 @@
 "use client";
 
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import {
+  Component,
+  Fragment,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
 
 type Props = { children: ReactNode };
 
@@ -40,9 +45,7 @@ export class BenignDomErrorBoundary extends Component<Props, State> {
   override render() {
     /* key scopes remount to this subtree only (never wrap the whole app). */
     return (
-      <span key={this.state.recoverKey} className="contents">
-        {this.props.children}
-      </span>
+      <Fragment key={this.state.recoverKey}>{this.props.children}</Fragment>
     );
   }
 }
