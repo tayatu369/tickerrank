@@ -1,7 +1,8 @@
 "use client";
 
-import { SignInButton, useUser } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { SiteFooter } from "../components/site-footer";
@@ -200,19 +201,28 @@ const lockedCtaClassName =
   "pointer-events-auto font-semibold text-[#3B82F6] hover:underline";
 
 function LockedUpgradeCta({ lockPrompt }: { lockPrompt: LockPrompt }) {
+  const { openSignIn } = useClerk();
+  const router = useRouter();
+
   if (lockPrompt === "sign-in") {
     return (
-      <SignInButton mode="modal">
-        <button type="button" className={lockedCtaClassName}>
-          Sign in to upgrade
-        </button>
-      </SignInButton>
+      <button
+        type="button"
+        className={lockedCtaClassName}
+        onClick={() => openSignIn()}
+      >
+        Sign in to upgrade
+      </button>
     );
   }
   return (
-    <Link href="/pricing" className={lockedCtaClassName}>
+    <button
+      type="button"
+      className={lockedCtaClassName}
+      onClick={() => router.push("/pricing")}
+    >
       Upgrade to Pro
-    </Link>
+    </button>
   );
 }
 

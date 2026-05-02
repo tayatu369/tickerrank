@@ -3,18 +3,18 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { type ReactNode } from "react";
 
-const publishableKey =
-  typeof process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY === "string"
-    ? process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.trim()
-    : "";
+type AppClerkProviderProps = {
+  children: ReactNode;
+  /** Production publishable key from `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (passed from root layout). */
+  publishableKey: string;
+};
 
 /** Client-only Clerk root so the server layout stays a Server Component. */
-export function AppClerkProvider({ children }: { children: ReactNode }) {
+export function AppClerkProvider({
+  children,
+  publishableKey,
+}: AppClerkProviderProps) {
   return (
-    <ClerkProvider
-      {...(publishableKey ? { publishableKey } : {})}
-    >
-      {children}
-    </ClerkProvider>
+    <ClerkProvider publishableKey={publishableKey}>{children}</ClerkProvider>
   );
 }

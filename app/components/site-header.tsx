@@ -7,15 +7,16 @@ export function SiteHeader() {
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
         <Link
           href="/"
-          className="flex items-center gap-2 text-lg font-semibold tracking-tight text-white"
+          className="flex shrink-0 items-center gap-2 outline-none ring-[#3B82F6] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B1120]"
         >
-          <span
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3B82F6] text-sm font-bold text-white"
-            aria-hidden
-          >
-            TR
-          </span>
-          <span>TickerRank</span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- SVG logo */}
+          <img
+            src="/icon.svg"
+            alt="TickerRank"
+            width={32}
+            height={32}
+            className="h-8 w-8 shrink-0 rounded-lg"
+          />
         </Link>
         <HomeAuthNav />
       </div>

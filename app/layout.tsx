@@ -20,6 +20,11 @@ export const metadata: Metadata = {
   },
 };
 
+const clerkPublishableKey =
+  typeof process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY === "string"
+    ? process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.trim()
+    : "";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -35,7 +40,10 @@ export default function RootLayout({
         className="min-h-full flex flex-col bg-[#0B1120] text-slate-100"
         suppressHydrationWarning
       >
-        <AppClerkProvider>{children}</AppClerkProvider>
+        {/* Ensure the production instance in Clerk Dashboard has the domain tickerrank.com added under Production → Domains, otherwise Clerk UI will not render. */}
+        <AppClerkProvider publishableKey={clerkPublishableKey}>
+          {children}
+        </AppClerkProvider>
       </body>
     </html>
   );

@@ -40,14 +40,7 @@ export function HomeAuthNav() {
             <UserButton appearance={userButtonAppearance} />
           </>
         ) : (
-          <SignInButton mode="modal">
-            <button
-              type="button"
-              className="rounded-lg border border-[#3B82F6]/40 bg-[#3B82F6]/10 px-4 py-2 text-sm font-medium text-[#3B82F6] hover:bg-[#3B82F6]/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6]"
-            >
-              Sign In
-            </button>
-          </SignInButton>
+          <SignInButton mode="modal" />
         )}
       </div>
     </BenignDomErrorBoundary>
