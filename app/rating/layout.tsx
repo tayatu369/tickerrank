@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { RatingPortalHoldProvider } from "../components/rating-portal-hold-context";
 
 export const metadata: Metadata = {
   title: "Stock rating | TickerRank",
@@ -26,7 +25,7 @@ export default function RatingLayout({
         </div>
       }
     >
-      <RatingPortalHoldProvider>{children}</RatingPortalHoldProvider>
+      {children}
     </Suspense>
   );
 }

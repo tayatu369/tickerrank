@@ -1,19 +1,10 @@
 "use client";
 
-import { SignInButton, useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  memo,
-  startTransition,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { memo, startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { HomeAuthNav } from "../components/home-auth-nav";
-import { useRatingPortalHold } from "../components/rating-portal-hold-context";
 import { RatingHistoryChart } from "./rating-history-chart";
 
 type RatingApiResponse = {
@@ -154,7 +145,6 @@ function Spinner({ className = "" }: { className?: string }) {
   );
 }
 
-/** Memoized: RatingPage can re-render (e.g. Clerk useUser) without reconciling the portal subtree in the same pass as RatingDetails updates. */
 const SiteHeader = memo(function SiteHeader() {
   return (
     <header className="border-b border-white/5 px-4 py-4 sm:px-6">
@@ -339,52 +329,31 @@ function MetricBars({
   );
 }
 
-/** Dev-only tracer removed — portal hold + stable refresh chrome avoid races without patching DOM APIs. */
 function RatingDetails({
   symbol,
   isPro,
   isSignedIn,
-  userLoaded,
 }: {
   symbol: string;
   isPro: boolean;
   isSignedIn: boolean;
-  userLoaded: boolean;
 }) {
-  const portalHold = useRatingPortalHold();
-  const setClerkPortalsHeld = portalHold?.setClerkPortalsHeld;
-
   const [data, setData] = useState<RatingApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [refreshBusy, setRefreshBusy] = useState(false);
-  const [refreshLimitError, setRefreshLimitError] = useState(false);
-  const [refreshErrorMessage, setRefreshErrorMessage] = useState<string | null>(
-    null,
-  );
-  const [refreshSuccess, setRefreshSuccess] = useState(false);
-  const refreshSuccessClearRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const [remainingRefreshes, setRemainingRefreshes] = useState<number | null>(
-    null,
-  );
   const [simulatedProgress, setSimulatedProgress] = useState(0);
   const [loadingFireCount, setLoadingFireCount] = useState(0);
   const [showSlowTip, setShowSlowTip] = useState(false);
   const [slowTipQuote, setSlowTipQuote] = useState<string | null>(null);
-  /** Bumps with rating data updates so the detail subtree remounts without flushSync (avoids React 19 hard crashes with Clerk). */
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const refreshInFlightRef = useRef(false);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
-      if (refreshSuccessClearRef.current != null) {
-        clearTimeout(refreshSuccessClearRef.current);
-      }
+      isMountedRef.current = false;
     };
   }, []);
 
@@ -426,6 +395,7 @@ function RatingDetails({
 
     let fires = 0;
     progressIntervalRef.current = setInterval(() => {
+      if (!isMountedRef.current) return;
       fires += 1;
       const stepIdx = Math.min(fires - 1, 4);
       setSimulatedProgress(loadingSteps[stepIdx]!.progress);
@@ -433,6 +403,7 @@ function RatingDetails({
     }, 1500);
 
     tipTimeoutRef.current = setTimeout(() => {
+      if (!isMountedRef.current) return;
       setSlowTipQuote(
         INVESTING_TIPS_BUFFETT[
           Math.floor(Math.random() * INVESTING_TIPS_BUFFETT.length)
@@ -459,7 +430,7 @@ function RatingDetails({
 
     const run = async () => {
       await Promise.resolve();
-      if (cancelled) return;
+      if (cancelled || !isMountedRef.current) return;
       setLoading(true);
       setError(false);
       setData(null);
@@ -468,13 +439,13 @@ function RatingDetails({
           `/api/rating?symbol=${encodeURIComponent(symbol)}`,
           { cache: "no-store" },
         );
-        if (cancelled) return;
+        if (cancelled || !isMountedRef.current) return;
         if (!res.ok) {
           setError(true);
           return;
         }
         const json = (await res.json()) as RatingApiResponse | { error?: string };
-        if (cancelled) return;
+        if (cancelled || !isMountedRef.current) return;
         if ("error" in json && json.error) {
           setError(true);
           return;
@@ -482,15 +453,18 @@ function RatingDetails({
         successDeferred = true;
         setSimulatedProgress(100);
         startTransition(() => {
+          if (!isMountedRef.current) return;
           setData(json as RatingApiResponse);
         });
         window.setTimeout(() => {
-          if (!cancelled) setLoading(false);
+          if (!cancelled && isMountedRef.current) setLoading(false);
         }, 200);
       } catch {
-        if (!cancelled) setError(true);
+        if (!cancelled && isMountedRef.current) setError(true);
       } finally {
-        if (!cancelled && !successDeferred) setLoading(false);
+        if (!cancelled && !successDeferred && isMountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 
@@ -499,153 +473,6 @@ function RatingDetails({
       cancelled = true;
     };
   }, [symbol]);
-
-  useEffect(() => {
-    setRemainingRefreshes(null);
-    setRefreshLimitError(false);
-    setRefreshKey(0);
-    setRefreshErrorMessage(null);
-    setRefreshSuccess(false);
-  }, [symbol]);
-
-  const applyRatingPayloadAfterRefresh = useCallback(
-    (payload: RatingApiResponse): Promise<void> => {
-      return new Promise((resolve) => {
-        requestAnimationFrame(() => {
-          setClerkPortalsHeld?.(true);
-          requestAnimationFrame(() => {
-            startTransition(() => {
-              setRefreshKey((k) => k + 1);
-              setData(payload);
-            });
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                setClerkPortalsHeld?.(false);
-                resolve();
-              });
-            });
-          });
-        });
-      });
-    },
-    [setClerkPortalsHeld],
-  );
-
-  const handleRefreshRating = useCallback(async () => {
-    if (!userLoaded || !data || loading || refreshBusy || refreshInFlightRef.current) {
-      return;
-    }
-    if (!isSignedIn) {
-      return;
-    }
-    refreshInFlightRef.current = true;
-    if (refreshSuccessClearRef.current != null) {
-      clearTimeout(refreshSuccessClearRef.current);
-      refreshSuccessClearRef.current = null;
-    }
-    startTransition(() => {
-      setRefreshSuccess(false);
-      setRefreshErrorMessage(null);
-      setRefreshLimitError(false);
-      setRefreshBusy(true);
-    });
-    try {
-      const res = await fetch("/api/refresh-rating", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol }),
-      });
-      let json: { success?: boolean; remaining?: number; error?: string } = {};
-      try {
-        const text = await res.text();
-        json = text ? (JSON.parse(text) as typeof json) : {};
-      } catch {
-        /* ignore malformed body */
-      }
-      if (res.status === 429) {
-        const msg =
-          typeof json.error === "string" && json.error
-            ? json.error
-            : "Daily refresh limit reached. Upgrade to Pro for unlimited refreshes.";
-        startTransition(() => {
-          setRefreshLimitError(true);
-          setRefreshErrorMessage(msg);
-        });
-        return;
-      }
-      if (!res.ok) {
-        const msg =
-          typeof json.error === "string" && json.error
-            ? json.error
-            : `Refresh failed (${res.status})`;
-        startTransition(() => {
-          setRefreshErrorMessage(msg);
-        });
-        return;
-      }
-      startTransition(() => {
-        if (typeof json.remaining === "number") {
-          setRemainingRefreshes(json.remaining);
-        }
-      });
-
-      const ratingRes = await fetch(
-        `/api/rating?symbol=${encodeURIComponent(symbol)}`,
-        { cache: "no-store" },
-      );
-      if (!ratingRes.ok) {
-        startTransition(() => {
-          setRefreshErrorMessage(`Could not reload rating (${ratingRes.status})`);
-        });
-        return;
-      }
-      let ratingJson: RatingApiResponse | { error?: string };
-      try {
-        ratingJson = (await ratingRes.json()) as
-          | RatingApiResponse
-          | { error?: string };
-      } catch {
-        startTransition(() => {
-          setRefreshErrorMessage("Could not parse rating response");
-        });
-        return;
-      }
-      if ("error" in ratingJson && ratingJson.error) {
-        startTransition(() => {
-          setRefreshErrorMessage(String(ratingJson.error));
-        });
-        return;
-      }
-
-      await applyRatingPayloadAfterRefresh(ratingJson as RatingApiResponse);
-
-      startTransition(() => {
-        setRefreshSuccess(true);
-      });
-      refreshSuccessClearRef.current = setTimeout(() => {
-        startTransition(() => setRefreshSuccess(false));
-        refreshSuccessClearRef.current = null;
-      }, 2500);
-    } finally {
-      refreshInFlightRef.current = false;
-      startTransition(() => {
-        setRefreshBusy(false);
-      });
-      setClerkPortalsHeld?.(false);
-    }
-  }, [
-    data,
-    isSignedIn,
-    loading,
-    refreshBusy,
-    symbol,
-    userLoaded,
-    setClerkPortalsHeld,
-    applyRatingPayloadAfterRefresh,
-  ]);
-
-  const showRefreshUi =
-    userLoaded && Boolean(data) && !loading && !error;
 
   const gradeStyle = data ? gradeBadgeStyle(data.rating) : null;
   const conclusionResolved = data
@@ -660,7 +487,8 @@ function RatingDetails({
   const lockPrompt: LockPrompt = isSignedIn ? "upgrade" : "sign-in";
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+    <div className="rating-details-root min-w-0">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
       {error ? (
         <div
           className="mb-8 rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
@@ -721,75 +549,9 @@ function RatingDetails({
             </div>
           )}
         </div>
-
-        {showRefreshUi ? (
-          <div className="mt-4 flex flex-col gap-3 border-t border-white/5 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            {refreshSuccess ? (
-              <p
-                className="text-sm font-medium text-emerald-200"
-                role="status"
-              >
-                Rating refreshed
-              </p>
-            ) : null}
-            {refreshErrorMessage ? (
-              <p
-                className="text-sm leading-relaxed text-rose-200"
-                role="alert"
-              >
-                {refreshErrorMessage}{" "}
-                {refreshLimitError ? (
-                  <Link
-                    href="/pricing"
-                    className="font-semibold text-[#93C5FD] underline decoration-[#3B82F6]/50 underline-offset-2 hover:text-white"
-                  >
-                    Upgrade to Pro
-                  </Link>
-                ) : null}
-              </p>
-            ) : null}
-            <div className="flex flex-col gap-2 sm:ms-auto sm:items-end">
-              {isSignedIn && remainingRefreshes !== null ? (
-                <p className="text-xs tabular-nums text-slate-500">
-                  {remainingRefreshes < 0
-                    ? "Unlimited refreshes today"
-                    : remainingRefreshes === 0
-                      ? "No refreshes left today"
-                      : `${remainingRefreshes} refresh${remainingRefreshes === 1 ? "" : "es"} left today`}
-                </p>
-              ) : null}
-              {isSignedIn ? (
-                <button
-                  type="button"
-                  onClick={() => void handleRefreshRating()}
-                  disabled={refreshBusy}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-xl border border-white/15 bg-white/[0.06] px-4 py-2.5 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6] disabled:pointer-events-none disabled:opacity-50 sm:self-end"
-                >
-                  {refreshBusy ? (
-                    <>
-                      <Spinner className="size-4 border-white/20 border-t-[#3B82F6]" />
-                      Refreshing…
-                    </>
-                  ) : (
-                    "Refresh Rating"
-                  )}
-                </button>
-              ) : (
-                <SignInButton mode="modal">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-xl border border-[#3B82F6]/40 bg-[#3B82F6]/10 px-4 py-2.5 text-sm font-semibold text-[#3B82F6] transition-colors hover:bg-[#3B82F6]/20 sm:self-end"
-                  >
-                    Sign in to refresh
-                  </button>
-                </SignInButton>
-              )}
-            </div>
-          </div>
-        ) : null}
       </div>
 
-      <div key={`${symbol}-${refreshKey}`} className="contents">
+      <div key={symbol} className="contents">
         <div className="mt-8 flex flex-col gap-6 border-b border-white/10 pb-8 sm:flex-row sm:items-center">
             <div className="flex-1">
               {loading ? (
@@ -1014,6 +776,7 @@ function RatingDetails({
         ) : null}
       </div>
     </main>
+    </div>
   );
 }
 
@@ -1043,7 +806,6 @@ export default function RatingPage() {
         symbol={symbol}
         isPro={isPro}
         isSignedIn={isSignedIn}
-        userLoaded={userLoaded}
       />
       <SiteFooter />
     </div>

@@ -3,7 +3,6 @@
 import { SignInButton, UserButton, useAuth } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { BenignDomErrorBoundary } from "./benign-dom-error-boundary";
-import { useRatingPortalHold } from "./rating-portal-hold-context";
 
 const userButtonAppearance = {
   elements: {
@@ -23,12 +22,11 @@ function ClerkNavSkeleton() {
 /**
  * useAuth + branch avoids Clerk &lt;Show&gt; swapping parallel trees.
  * Deferred portal mount (after commit) reduces Strict Mode / concurrent
- * races with sibling trees (e.g. rating page API-driven updates).
+ * races with sibling trees.
  */
 export function HomeAuthNav() {
   const { isLoaded, isSignedIn } = useAuth();
   const [portalsReady, setPortalsReady] = useState(false);
-  const portalHold = useRatingPortalHold();
 
   useEffect(() => {
     let alive = true;
@@ -45,10 +43,6 @@ export function HomeAuthNav() {
       cancelAnimationFrame(raf2);
     };
   }, []);
-
-  if (portalHold?.clerkPortalsHeld) {
-    return <ClerkNavSkeleton />;
-  }
 
   if (!isLoaded || !portalsReady) {
     return <ClerkNavSkeleton />;
