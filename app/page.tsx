@@ -1,3 +1,5 @@
+import { HomeExampleRatingCard } from "./components/home-example-rating-card";
+import { HomePricingTeaser } from "./components/home-pricing-teaser";
 import { SiteFooter } from "./components/site-footer";
 import { SiteHeader } from "./components/site-header";
 
@@ -64,6 +66,8 @@ export default function Home() {
           </form>
         </div>
 
+        <HomeExampleRatingCard />
+
         <section
           aria-labelledby="features-heading"
           className="mx-auto mt-20 w-full max-w-5xl sm:mt-24"
@@ -89,6 +93,8 @@ export default function Home() {
             ))}
           </ul>
         </section>
+
+        <HomePricingTeaser />
       </main>
 
       <SiteFooter />
