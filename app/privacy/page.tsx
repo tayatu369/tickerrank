@@ -6,7 +6,7 @@ import { SiteHeader } from "../components/site-header";
 export const metadata: Metadata = {
   title: "Privacy Policy — TickerRank",
   description:
-    "How TickerRank collects, uses, and protects information when you use our stock rating tool.",
+    "How TickerRank collects, uses, and protects information when you use tickerrank.com.",
 };
 
 export default function PrivacyPage() {
@@ -20,114 +20,179 @@ export default function PrivacyPage() {
             Privacy Policy
           </h1>
           <p className="mt-4 text-sm text-slate-400">
-            Last updated: May 2, 2026
+            Last Updated: May 2026
           </p>
 
           <div className="mt-10 max-w-none space-y-6 text-sm leading-relaxed text-slate-300 sm:text-base">
             <p>
-              TickerRank (“we,” “us,” or “our”) operates an AI-assisted stock
-              rating tool that displays letter-grade style ratings and related
-              information for educational and informational purposes. This
-              Privacy Policy describes how we collect, use, and share
-              information when you use our website and services (the
-              “Services”).
+              TickerRank (“we,” “us,” or “our”) operates tickerrank.com and
+              related services (the “Services”), including an AI-assisted stock
+              rating tool. This Privacy Policy describes how we collect, use,
+              store, and share information when you use the Services.
             </p>
 
             <h2 className="scroll-mt-24 text-xl font-semibold text-white">
               1. Information we collect
             </h2>
-            <p>
-              <strong>Account information.</strong> If you sign in with Clerk,
-              we process information that Clerk provides to us as part of
-              authentication, which may include your email address, name, user
-              ID, and profile image, depending on your sign-in method and
-              settings.
-            </p>
-            <p>
-              <strong>Subscription and billing.</strong> If you subscribe to
-              TickerRank Pro, payment processing is handled by Stripe. Stripe
-              collects and processes payment card and billing details according
-              to its own privacy policy. We typically receive limited
-              subscription status from Stripe (for example, whether a
-              subscription is active) rather than full payment card numbers.
-            </p>
-            <p>
-              <strong>Stock queries and ratings.</strong> When you request a
-              rating for a ticker symbol, we process the symbol you submit and
-              related technical data needed to fulfill the request (for
-              example, server logs and request metadata such as timestamps and
-              approximate device or browser information). Ratings may be cached
-              or stored on our infrastructure to operate the Services and
-              enforce usage limits.
-            </p>
-            <p>
-              <strong>Technical and usage data.</strong> Like most websites, we
-              may collect diagnostic and security information such as IP
-              address, browser type, device type, and pages visited. We use this
-              data to operate, secure, and improve the Services.
-            </p>
-
-            <h2 className="scroll-mt-24 text-xl font-semibold text-white">
-              2. How we use information
-            </h2>
-            <p>We use the information above to:</p>
+            <p>We collect the following categories of information:</p>
             <ul className="list-disc space-y-2 pl-5">
-              <li>Provide and maintain the Services, including ratings and Pro features;</li>
-              <li>Authenticate users and manage accounts;</li>
-              <li>Process payments and subscriptions through Stripe;</li>
-              <li>Communicate with you about your account or subscription where appropriate;</li>
-              <li>Detect abuse, fraud, and security issues;</li>
-              <li>Analyze usage in aggregate to improve product quality and reliability.</li>
+              <li>
+                <strong className="font-semibold text-slate-200">
+                  Email and account information (via Clerk).
+                </strong>{" "}
+                When you sign in, Clerk handles authentication and shares with us
+                data needed to operate your account, including your email address
+                and may include your name, user ID, and profile image depending
+                on how you sign in.
+              </li>
+              <li>
+                <strong className="font-semibold text-slate-200">
+                  Payment information (via Stripe).
+                </strong>{" "}
+                If you subscribe to TickerRank Pro, Stripe collects and
+                processes payment card details and billing information under
+                Stripe’s policies. We receive limited billing and subscription
+                status from Stripe (for example, active subscription state), not
+                your full payment card numbers.
+              </li>
+              <li>
+                <strong className="font-semibold text-slate-200">
+                  Stock ticker queries.
+                </strong>{" "}
+                When you request a rating, we process the ticker symbols you
+                submit and related request data needed to return a result.
+              </li>
+              <li>
+                <strong className="font-semibold text-slate-200">
+                  Usage and technical logs.
+                </strong>{" "}
+                We collect diagnostic and security-related information such as IP
+                address, timestamps, approximate device or browser metadata, and
+                server logs reflecting how you use the Services—used to operate,
+                secure, and troubleshoot the platform.
+              </li>
             </ul>
 
             <h2 className="scroll-mt-24 text-xl font-semibold text-white">
-              3. Sharing of information
+              2. How we use your data
             </h2>
             <p>
-              We share information with service providers who help us operate
-              the Services, including Clerk (authentication), Stripe (payments),
-              hosting and infrastructure providers, and AI or data vendors where
-              needed to generate ratings. These providers process data under
-              contractual safeguards appropriate to their roles.
+              We use the information described above solely for legitimate
+              business purposes tied to running TickerRank, including to:
             </p>
+            <ul className="list-disc space-y-2 pl-5">
+              <li>
+                Provide and improve the AI stock rating experience and enforce
+                plan limits (for example, free-tier usage caps);
+              </li>
+              <li>Authenticate you, manage accounts, and communicate about the Services;</li>
+              <li>
+                Process and manage subscriptions and payments through Stripe;
+              </li>
+              <li>
+                Maintain security, detect abuse or fraud, and improve product
+                quality and reliability based on aggregated or operational
+                patterns.
+              </li>
+            </ul>
+
+            <h2 className="scroll-mt-24 text-xl font-semibold text-white">
+              3. Third-party services
+            </h2>
             <p>
-              We may disclose information if required by law, legal process, or
-              to protect the rights, safety, or integrity of users or TickerRank.
+              We rely on third-party processors to operate tickerrank.com. They
+              handle data according to their own terms and privacy policies:
+            </p>
+            <ul className="list-disc space-y-2 pl-5">
+              <li>
+                <strong className="font-semibold text-slate-200">Clerk</strong> —
+                authentication and session management.
+              </li>
+              <li>
+                <strong className="font-semibold text-slate-200">Stripe</strong> —
+                payment processing for TickerRank Pro.
+              </li>
+              <li>
+                <strong className="font-semibold text-slate-200">Vercel</strong> —
+                hosting and deployment of our website and application
+                infrastructure.
+              </li>
+              <li>
+                <strong className="font-semibold text-slate-200">
+                  OpenRouter
+                </strong>{" "}
+                — powering AI-generated stock ratings submitted through the
+                Services.
+              </li>
+            </ul>
+
+            <h2 className="scroll-mt-24 text-xl font-semibold text-white">
+              4. Stock query data retention
+            </h2>
+            <p>
+              Data associated with stock ticker lookups (such as cached query
+              and rating payloads used to operate the Services) is retained for{" "}
+              <strong className="font-semibold text-slate-200">
+                up to 24 hours
+              </strong>{" "}
+              and is then automatically deleted from our systems, except where a
+              longer period is required by law or to resolve disputes or abuse
+              investigations.
             </p>
 
             <h2 className="scroll-mt-24 text-xl font-semibold text-white">
-              4. Data retention
+              5. Cookies
             </h2>
             <p>
-              We retain information as long as reasonably necessary to provide
-              the Services, comply with legal obligations, resolve disputes,
-              and enforce our agreements. Retention periods may vary depending
-              on the type of data and operational needs.
+              We use cookies and similar technologies that are necessary for
+              authentication through Clerk—for example to keep you signed in
+              securely across sessions.{" "}
+              <strong className="font-semibold text-slate-200">
+                We do not use tracking cookies for advertising purposes.
+              </strong>
             </p>
 
             <h2 className="scroll-mt-24 text-xl font-semibold text-white">
-              5. Security
+              6. Your rights (access, deletion, portability)
             </h2>
             <p>
-              We implement reasonable administrative, technical, and physical
-              safeguards designed to protect information we process. No method of
-              transmission or storage is completely secure.
+              Depending on where you live, you may have the right to request
+              access to the personal data we hold about you, ask us to delete
+              personal data subject to lawful exceptions, and request data
+              portability where applicable. To exercise{" "}
+              <strong className="font-semibold text-slate-200">access</strong>,{" "}
+              <strong className="font-semibold text-slate-200">deletion</strong>,
+              {" or "}
+              <strong className="font-semibold text-slate-200">
+                data portability
+              </strong>
+              , email us using the contact information below. Include enough
+              detail for us to verify your request. You may also manage some
+              account settings through Clerk and subscription billing through
+              Stripe where those tools apply.
             </p>
 
             <h2 className="scroll-mt-24 text-xl font-semibold text-white">
-              6. Your choices
+              7. Sharing of information
             </h2>
             <p>
-              Depending on your location, you may have rights to access,
-              correct, delete, or restrict certain processing of your personal
-              information, or to object to processing or export data. To exercise
-              these rights, contact us using the information below. You may also
-              manage some account settings through Clerk or cancel your
-              subscription through Stripe’s customer flows where available.
+              We share information with the providers listed above to deliver
+              the Services, under agreements appropriate for their roles. We may
+              also disclose information if required by law, legal process, or to
+              protect the rights, safety, or integrity of users or TickerRank.
             </p>
 
             <h2 className="scroll-mt-24 text-xl font-semibold text-white">
-              7. Children’s privacy
+              8. Security
+            </h2>
+            <p>
+              We use reasonable administrative, technical, and organizational
+              measures designed to protect information we process. No method of
+              transmission or storage over the Internet is perfectly secure.
+            </p>
+
+            <h2 className="scroll-mt-24 text-xl font-semibold text-white">
+              9. Children’s privacy
             </h2>
             <p>
               The Services are not directed to children under 13, and we do not
@@ -135,21 +200,29 @@ export default function PrivacyPage() {
             </p>
 
             <h2 className="scroll-mt-24 text-xl font-semibold text-white">
-              8. Changes
+              10. Changes to this policy
             </h2>
             <p>
-              We may update this Privacy Policy from time to time. We will post
-              the updated policy on this page and revise the “Last updated” date
-              above.
+              We may update this Privacy Policy periodically. Updates will be
+              posted on this page, and we will revise the “Last Updated” date
+              above accordingly.
             </p>
 
             <h2 className="scroll-mt-24 text-xl font-semibold text-white">
-              9. Contact
+              11. Contact Us
             </h2>
             <p>
-              For privacy questions, contact us at the support channel listed on
-              the TickerRank website, or reach out through your account
-              dashboard if available.
+              Questions about privacy, your data, or this policy? Contact us:
+            </p>
+            <p className="m-0 rounded-lg border border-white/10 bg-white/5 p-4 text-slate-200">
+              <strong className="font-semibold text-white">TickerRank Support</strong>
+              <br />
+              <a
+                href="mailto:support@tickerrank.com"
+                className="text-[#3B82F6] underline underline-offset-2 hover:text-[#60A5FA]"
+              >
+                support@tickerrank.com
+              </a>
             </p>
 
             <p className="border-t border-white/10 pt-6 text-sm text-slate-400">
