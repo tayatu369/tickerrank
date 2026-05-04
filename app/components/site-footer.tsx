@@ -20,6 +20,12 @@ export function SiteFooter() {
           >
             Terms of Service
           </Link>
+          <Link
+            href="/feature-requests"
+            className="text-slate-400 transition-colors hover:text-[#3B82F6]"
+          >
+            Feature Requests
+          </Link>
         </nav>
         <p className="max-w-md text-center text-xs text-slate-500 sm:text-right">
           Not financial advice. NFA.
