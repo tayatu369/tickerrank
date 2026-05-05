@@ -1,8 +1,12 @@
 import {
+  isKvUnavailableError,
+  kvDecrSafe,
   kvGetSafe,
+  kvIncrSafe,
   kvSetSafe,
   warnKvUnavailableOnce,
 } from "@/lib/kv-safe";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
@@ -92,6 +96,54 @@ function validateSymbol(raw: string | null): string | null {
   const symbol = raw.trim().toUpperCase();
   if (!/^[A-Z]{1,10}$/.test(symbol)) return null;
   return symbol;
+}
+
+function utcDateKey(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+function countFromKvGet(raw: unknown): number {
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string") {
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+/** Enforces free-tier daily rating fetches via KV (Pro skipped). Returns 429 response or null to continue. */
+async function consumeRatingUsageOrLimitResponse(
+  userId: string,
+  todayKey: string,
+): Promise<NextResponse | null> {
+  const client = await clerkClient();
+  const user = await client.users.getUser(userId);
+  const subscription = user.publicMetadata?.subscription;
+  const isPro = subscription === "pro";
+  if (isPro) return null;
+
+  const usageKey = `usage:${userId}:${todayKey}`;
+  try {
+    const priorRaw = await kvGetSafe(usageKey);
+    const prior = countFromKvGet(priorRaw);
+    if (prior >= 3) {
+      return NextResponse.json({ error: "Daily limit reached" }, { status: 429 });
+    }
+
+    const newCount = await kvIncrSafe(usageKey);
+
+    if (newCount !== null && newCount > 3) {
+      await kvDecrSafe(usageKey);
+      return NextResponse.json({ error: "Daily limit reached" }, { status: 429 });
+    }
+  } catch (err) {
+    console.error("[rating API] usage KV block", err);
+    if (isKvUnavailableError(err)) {
+      warnKvUnavailableOnce();
+    }
+  }
+
+  return null;
 }
 
 function yahooQuoteIndicatesRecognizedSymbol(
@@ -575,8 +627,14 @@ export async function GET(request: NextRequest) {
     }
 
     const utcToday = new Date();
-    const cacheDate = `${utcToday.getUTCFullYear()}-${String(utcToday.getUTCMonth() + 1).padStart(2, "0")}-${String(utcToday.getUTCDate()).padStart(2, "0")}`;
+    const cacheDate = utcDateKey(utcToday);
     const cacheKey = `rating:${symbol}:${cacheDate}`;
+
+    const { userId } = await auth();
+    if (userId) {
+      const limited = await consumeRatingUsageOrLimitResponse(userId, cacheDate);
+      if (limited) return limited;
+    }
 
     let cached: Record<string, unknown> | null = null;
     try {

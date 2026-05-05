@@ -216,6 +216,108 @@ function triggerSignIn(openSignIn: () => unknown): void {
   }
 }
 
+const ANON_RATING_STORAGE_KEY = "tickerrank_daily_count";
+
+function localCalendarDateKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+type AnonDailyStored = { date: string; count: number };
+
+function parseAnonDailyStored(raw: string | null): AnonDailyStored {
+  if (!raw) return { date: "", count: 0 };
+  try {
+    const v = JSON.parse(raw) as unknown;
+    if (!v || typeof v !== "object") return { date: "", count: 0 };
+    const o = v as Record<string, unknown>;
+    const date = typeof o.date === "string" ? o.date : "";
+    const count =
+      typeof o.count === "number" && Number.isFinite(o.count) ? Math.max(0, Math.floor(o.count)) : 0;
+    return { date, count };
+  } catch {
+    return { date: "", count: 0 };
+  }
+}
+
+/** Increments today's anonymous rating count after a successful quota check; returns false when blocked. */
+function tryConsumeAnonymousDailyRating(): boolean {
+  const today = localCalendarDateKey();
+  const prev = parseAnonDailyStored(
+    typeof window !== "undefined" ? window.localStorage.getItem(ANON_RATING_STORAGE_KEY) : null,
+  );
+  const countBase = prev.date === today ? prev.count : 0;
+  if (countBase >= 3) return false;
+  const next: AnonDailyStored = { date: today, count: countBase + 1 };
+  try {
+    window.localStorage.setItem(ANON_RATING_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    /* quota / private mode — allow request rather than brick the page */
+  }
+  return true;
+}
+
+function DailyRatingLimitModal({
+  open,
+  variant,
+}: {
+  open: boolean;
+  variant: "anonymous" | "free-tier";
+}) {
+  const { openSignIn } = useClerk();
+  const router = useRouter();
+
+  if (!open) return null;
+
+  const panelClass =
+    "relative z-10 w-full max-w-md rounded-2xl border border-white/15 bg-[#0f172a] p-6 shadow-2xl shadow-black/60";
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 px-4 py-8 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="daily-limit-title"
+    >
+      <div className={panelClass}>
+        <h2 id="daily-limit-title" className="text-lg font-semibold text-white">
+          Daily limit reached
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-slate-300">
+          You&apos;ve used 3 free ratings today. Sign up to continue.
+        </p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          {variant === "anonymous" ? (
+            <>
+              <button
+                type="button"
+                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-[#3B82F6] px-5 text-sm font-semibold text-white hover:bg-[#2563EB]"
+                onClick={() => triggerSignIn(openSignIn)}
+              >
+                Sign Up
+              </button>
+              <Link
+                href="/pricing"
+                className="text-center text-sm font-semibold text-[#93C5FD] hover:underline sm:text-left"
+              >
+                Upgrade to Pro
+              </Link>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-[#3B82F6] px-5 text-sm font-semibold text-white hover:bg-[#2563EB]"
+              onClick={() => router.push("/pricing")}
+            >
+              Upgrade to Pro
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LockedUpgradeCta({ lockPrompt }: { lockPrompt: LockPrompt }) {
   const { openSignIn } = useClerk();
   const router = useRouter();
@@ -345,14 +447,19 @@ function RatingDetails({
   symbol,
   isPro,
   isSignedIn,
+  userLoaded,
 }: {
   symbol: string;
   isPro: boolean;
   isSignedIn: boolean;
+  userLoaded: boolean;
 }) {
   const [data, setData] = useState<RatingApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [dailyLimitModal, setDailyLimitModal] = useState<
+    null | "anonymous" | "free-tier"
+  >(null);
   const [symbolNotRecognized, setSymbolNotRecognized] = useState(false);
   const [simulatedProgress, setSimulatedProgress] = useState(0);
   const [loadingFireCount, setLoadingFireCount] = useState(0);
@@ -441,16 +548,34 @@ function RatingDetails({
   }, [loading, loadingSteps]);
 
   useEffect(() => {
+    setDailyLimitModal(null);
+  }, [symbol]);
+
+  const displayAwaitingRating = !userLoaded || loading;
+
+  useEffect(() => {
     let cancelled = false;
     let successDeferred = false;
 
     const run = async () => {
       await Promise.resolve();
-      if (cancelled || !isMountedRef.current) return;
+      if (!userLoaded || cancelled || !isMountedRef.current) return;
       setLoading(true);
       setError(false);
       setSymbolNotRecognized(false);
       setData(null);
+      setDailyLimitModal(null);
+
+      if (!isPro && !isSignedIn) {
+        if (!tryConsumeAnonymousDailyRating()) {
+          if (!cancelled && isMountedRef.current) {
+            setDailyLimitModal("anonymous");
+            setLoading(false);
+          }
+          return;
+        }
+      }
+
       try {
         const res = await fetch(
           `/api/rating?symbol=${encodeURIComponent(symbol)}`,
@@ -460,6 +585,8 @@ function RatingDetails({
         if (!res.ok) {
           if (res.status === 400) {
             setSymbolNotRecognized(true);
+          } else if (res.status === 429) {
+            setDailyLimitModal("free-tier");
           } else {
             setError(true);
           }
@@ -494,7 +621,7 @@ function RatingDetails({
     return () => {
       cancelled = true;
     };
-  }, [symbol]);
+  }, [symbol, userLoaded, isPro, isSignedIn]);
 
   const gradeStyle = data ? gradeBadgeStyle(data.rating) : null;
   const conclusionResolved = data
@@ -510,6 +637,10 @@ function RatingDetails({
 
   return (
     <div className="rating-details-root min-w-0">
+      <DailyRatingLimitModal
+        open={dailyLimitModal !== null}
+        variant={dailyLimitModal === "free-tier" ? "free-tier" : "anonymous"}
+      />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
       {symbolNotRecognized ? (
         <div
@@ -529,7 +660,7 @@ function RatingDetails({
         </div>
       ) : null}
 
-      {data && !loading && showFallbackNotice ? (
+      {data && !displayAwaitingRating && showFallbackNotice ? (
         <div
           className="mb-8 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
           role="status"
@@ -550,11 +681,11 @@ function RatingDetails({
                 {symbol}
               </span>
               <span className="text-lg text-slate-400 sm:text-xl">
-                {loading || !data ? "…" : data.companyName}
+                {displayAwaitingRating || !data ? "…" : data.companyName}
               </span>
             </h1>
           </div>
-          {loading ? (
+          {displayAwaitingRating ? (
             <div className="inline-flex h-[4.5rem] min-w-[5.5rem] shrink-0 items-center justify-center rounded-2xl border-2 border-white/10 bg-white/[0.04] px-6 py-3 text-slate-500">
               <Spinner className="size-8 border-white/15 border-t-slate-400" />
             </div>
@@ -585,7 +716,7 @@ function RatingDetails({
       <div key={symbol} className="contents">
         <div className="mt-8 flex flex-col gap-6 border-b border-white/10 pb-8 sm:flex-row sm:items-center">
             <div className="flex-1">
-              {loading ? (
+              {displayAwaitingRating ? (
                 <div className="w-full space-y-3">
                   <div
                     className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
@@ -662,7 +793,7 @@ function RatingDetails({
               <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
                 Conclusion
               </p>
-              {loading ? (
+              {displayAwaitingRating ? (
                 <p className="mt-1 text-sm text-slate-500">…</p>
               ) : data && conclusionResolved ? (
                 <p
@@ -688,7 +819,7 @@ function RatingDetails({
           </div>
         </section>
 
-        {data && !loading ? (
+        {data && !displayAwaitingRating ? (
           <div>
             <section className="mt-10" aria-labelledby="metrics-heading">
               <h2
@@ -837,6 +968,7 @@ export default function RatingPage() {
         symbol={symbol}
         isPro={isPro}
         isSignedIn={isSignedIn}
+        userLoaded={userLoaded}
       />
       <SiteFooter />
     </div>
