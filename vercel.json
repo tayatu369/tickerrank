@@ -1,25 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/cron/generate-content",
-      "schedule": "0 14 * * *",
-      "headers": {
-        "x-cron-secret": "@cron-secret"
-      }
-    },
-    {
-      "path": "/api/cron/generate-voiceover",
-      "schedule": "30 14 * * *",
-      "headers": {
-        "x-cron-secret": "@cron-secret"
-      }
-    }
-  ]
-}
-
-{
-  "crons": [
-    {
       "path": "/api/cron/prewarm",
       "schedule": "0 14 * * *",
       "headers": {
