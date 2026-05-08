@@ -1,11 +1,9 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
-      "path": "/api/cron/prewarm",
-      "schedule": "0 14 * * *",
-      "headers": {
-        "x-cron-secret": "@cron-secret"
-      }
+      "path": "/cron/prewarm",
+      "schedule": "0 14 * * *"
     }
   ]
 }

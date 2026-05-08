@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          error: "No daily content in KV; run /api/cron/generate-content first.",
+          error: "No daily content in KV; run /cron/generate-content first.",
         },
         { status: 503 },
       );
