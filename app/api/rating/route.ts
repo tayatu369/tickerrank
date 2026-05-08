@@ -618,57 +618,82 @@ async function runRatingModel(
   }
 }
 
-export async function GET(request: NextRequest) {
+export type DailyCachedRatingResult =
+  | { ok: true; responseBody: Record<string, unknown> }
+  | {
+      ok: false;
+      status: number;
+      responseBody: Record<string, unknown>;
+    };
+
+/**
+ * Same cache + generation path as GET /api/rating (after symbol validation and optional usage accounting).
+ * Used by cron prewarm and the public rating route.
+ */
+export async function getOrGenerateDailyCachedRating(
+  symbol: string,
+): Promise<DailyCachedRatingResult> {
+  const normalized = validateSymbol(symbol);
+  if (!normalized) {
+    return {
+      ok: false,
+      status: 400,
+      responseBody: { error: "Invalid symbol" },
+    };
+  }
+
+  const utcToday = new Date();
+  const cacheDate = utcDateKey(utcToday);
+  const cacheKey = `rating:${normalized}:${cacheDate}`;
+
+  let cached: Record<string, unknown> | null = null;
   try {
-    const symbolParam = request.nextUrl.searchParams.get("symbol");
-    const symbol = validateSymbol(symbolParam);
-    if (!symbol) {
-      return NextResponse.json({ error: "Invalid symbol" }, { status: 400 });
-    }
+    cached = await kvGetSafe<Record<string, unknown>>(cacheKey);
+  } catch {
+    warnKvUnavailableOnce();
+    cached = null;
+  }
+  if (cached) {
+    return {
+      ok: true,
+      responseBody: { ...cached, cached: true },
+    };
+  }
 
-    const utcToday = new Date();
-    const cacheDate = utcDateKey(utcToday);
-    const cacheKey = `rating:${symbol}:${cacheDate}`;
+  let openaiApiKey: string;
+  let finnhubApiKey: string;
+  try {
+    openaiApiKey = requireEnv("OPENAI_API_KEY");
+    finnhubApiKey = requireEnv("FINNHUB_API_KEY");
+  } catch (err) {
+    logError("getOrGenerateDailyCachedRating env", err);
+    return {
+      ok: false,
+      status: 500,
+      responseBody: { error: "Failed to generate rating" },
+    };
+  }
 
-    const { userId } = await auth();
-    if (userId) {
-      const limited = await consumeRatingUsageOrLimitResponse(userId, cacheDate);
-      if (limited) return limited;
-    }
+  const openai = new OpenAI({
+    apiKey: openaiApiKey,
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+      "HTTP-Referer": process.env.OPENROUTER_APP_URL || "http://localhost:3000",
+      "X-Title": process.env.OPENROUTER_APP_NAME || "TickerRank",
+    },
+    timeout: OPENAI_TIMEOUT_MS,
+  });
 
-    let cached: Record<string, unknown> | null = null;
+  let companyName: string;
+  let metrics: FinancialMetricsPayload;
+
+  try {
     try {
-      cached = await kvGetSafe<Record<string, unknown>>(cacheKey);
-    } catch {
-      warnKvUnavailableOnce();
-      cached = null;
-    }
-    if (cached) {
-      return NextResponse.json({ ...cached, cached: true });
-    }
-
-    const openaiApiKey = requireEnv("OPENAI_API_KEY");
-    const finnhubApiKey = requireEnv("FINNHUB_API_KEY");
-
-    const openai = new OpenAI({
-      apiKey: openaiApiKey,
-      baseURL: "https://openrouter.ai/api/v1",
-      defaultHeaders: {
-        "HTTP-Referer": process.env.OPENROUTER_APP_URL || "http://localhost:3000",
-        "X-Title": process.env.OPENROUTER_APP_NAME || "TickerRank",
-      },
-      timeout: OPENAI_TIMEOUT_MS,
-    });
-
-    let companyName: string;
-    let metrics: FinancialMetricsPayload;
-
-    try {
-      const yahooData = await fetchYahooBundle(symbol);
-      if (!yahooQuoteIndicatesRecognizedSymbol(symbol, yahooData.quote)) {
+      const yahooData = await fetchYahooBundle(normalized);
+      if (!yahooQuoteIndicatesRecognizedSymbol(normalized, yahooData.quote)) {
         throw new Error(YAHOO_QUOTE_UNRECOGNIZED);
       }
-      companyName = yahooCompanyName(yahooData.quote, symbol);
+      companyName = yahooCompanyName(yahooData.quote, normalized);
       metrics = buildMetricsFromYahoo(yahooData);
     } catch (yahooErr) {
       const silentUnrecognized =
@@ -676,29 +701,37 @@ export async function GET(request: NextRequest) {
         yahooErr.message === YAHOO_QUOTE_UNRECOGNIZED;
       if (!silentUnrecognized) {
         logError(
-          `Yahoo Finance failed for ${symbol}; switching data source to Finnhub`,
+          `Yahoo Finance failed for ${normalized}; switching data source to Finnhub`,
           yahooErr,
         );
         console.error(
-          `[rating API] Fallback: using Finnhub for symbol=${symbol} (Yahoo error above)`,
+          `[rating API] Fallback: using Finnhub for symbol=${normalized} (Yahoo error above)`,
         );
       }
       try {
-        const finnhub = await fetchFinnhubBundle(symbol, finnhubApiKey);
+        const finnhub = await fetchFinnhubBundle(normalized, finnhubApiKey);
         companyName = finnhub.companyName;
         metrics = finnhub.metrics;
         console.log(
-          `[rating API] Finnhub fallback succeeded for symbol=${symbol}`,
+          `[rating API] Finnhub fallback succeeded for symbol=${normalized}`,
         );
       } catch (finnhubErr) {
         if (finnhubErr instanceof SymbolNotFoundError) {
-          return NextResponse.json({ error: SYMBOL_NOT_FOUND }, { status: 400 });
+          return {
+            ok: false,
+            status: 400,
+            responseBody: { error: SYMBOL_NOT_FOUND },
+          };
         }
         logError(
-          `Finnhub fallback also failed for ${symbol} after Yahoo failure`,
+          `Finnhub fallback also failed for ${normalized} after Yahoo failure`,
           finnhubErr,
         );
-        throw finnhubErr;
+        return {
+          ok: false,
+          status: 500,
+          responseBody: { error: "Failed to generate rating" },
+        };
       }
     }
 
@@ -708,7 +741,7 @@ export async function GET(request: NextRequest) {
     const now = new Date();
 
     const ratingData = {
-      symbol,
+      symbol: normalized,
       companyName,
       rating,
       score,
@@ -719,7 +752,9 @@ export async function GET(request: NextRequest) {
         indicatorsCount: 12,
         modelVersion: "v1.0",
         dataUpdatedAt: now.toISOString(),
-        ratingValidUntil: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        ratingValidUntil: new Date(
+          now.getTime() + 7 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
       },
     };
 
@@ -734,7 +769,46 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(ratingData);
+    return { ok: true, responseBody: ratingData };
+  } catch (err) {
+    logError(`getOrGenerateDailyCachedRating(${normalized})`, err);
+    if (err instanceof SymbolNotFoundError) {
+      return {
+        ok: false,
+        status: 400,
+        responseBody: { error: SYMBOL_NOT_FOUND },
+      };
+    }
+    return {
+      ok: false,
+      status: 500,
+      responseBody: { error: "Failed to generate rating" },
+    };
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const symbolParam = request.nextUrl.searchParams.get("symbol");
+    const symbol = validateSymbol(symbolParam);
+    if (!symbol) {
+      return NextResponse.json({ error: "Invalid symbol" }, { status: 400 });
+    }
+
+    const utcToday = new Date();
+    const cacheDate = utcDateKey(utcToday);
+
+    const { userId } = await auth();
+    if (userId) {
+      const limited = await consumeRatingUsageOrLimitResponse(userId, cacheDate);
+      if (limited) return limited;
+    }
+
+    const result = await getOrGenerateDailyCachedRating(symbol);
+    if (!result.ok) {
+      return NextResponse.json(result.responseBody, { status: result.status });
+    }
+    return NextResponse.json(result.responseBody);
   } catch (err) {
     logError("GET /api/rating unhandled failure", err);
     if (err instanceof SymbolNotFoundError) {
