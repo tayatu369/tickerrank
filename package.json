@@ -14,6 +14,7 @@
     "@remotion/cli": "^4.0.459",
     "@remotion/renderer": "4.0.459",
     "@stripe/stripe-js": "^9.3.1",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/kv": "^3.0.0",
     "dotenv": "^17.4.2",
     "elevenlabs": "^1.59.0",
@@ -27,13 +28,13 @@
     "yahoo-finance2": "^3.14.0"
   },
   "devDependencies": {
-    "puppeteer-core": "24.8.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "puppeteer-core": "24.8.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

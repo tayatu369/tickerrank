@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { AppClerkProvider } from "./components/app-clerk-provider";
 import "./globals.css";
 
@@ -44,6 +45,7 @@ export default function RootLayout({
         <AppClerkProvider publishableKey={clerkPublishableKey}>
           {children}
         </AppClerkProvider>
+        <Analytics />
       </body>
     </html>
   );
