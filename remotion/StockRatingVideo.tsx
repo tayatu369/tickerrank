@@ -314,6 +314,50 @@ function ratingBadgeTone(rating: string): string {
   return "#EF4444";
 }
 
+const INTRO_STRONG_RATINGS = new Set(["A+", "A", "A-"]);
+const INTRO_NEUTRAL_RATINGS = new Set(["B+", "B", "B-"]);
+const INTRO_WEAK_RATINGS = new Set([
+  "C+",
+  "C",
+  "C-",
+  "D+",
+  "D",
+  "D-",
+  "F",
+]);
+
+function ratingIntroTier(rating: string): "strong" | "neutral" | "weak" {
+  const r = rating.trim().toUpperCase();
+  if (INTRO_STRONG_RATINGS.has(r)) return "strong";
+  if (INTRO_NEUTRAL_RATINGS.has(r)) return "neutral";
+  if (INTRO_WEAK_RATINGS.has(r)) return "weak";
+  if (r.startsWith("A")) return "strong";
+  if (r.startsWith("B")) return "neutral";
+  if (r.startsWith("C") || r.startsWith("D") || r.startsWith("F")) return "weak";
+  return "neutral";
+}
+
+function introHeadlineText(stock: string, rating: string): string {
+  const s = stock.trim();
+  const R = rating.trim();
+  switch (ratingIntroTier(rating)) {
+    case "strong":
+      return `${s} gets ${R} from TickerRank AI — market leader or bubble?`;
+    case "weak":
+      return `AI gives ${s} a ${R} — are investors ignoring the risks?`;
+    default:
+      return `${s} rated ${R} — hidden opportunity or stagnation?`;
+  }
+}
+
+/** Subtle emoji accent for letter extremes only (shock / question vibe). */
+function extremeIntroEmoji(rating: string): { emoji: string; kind: "high" | "low" } | null {
+  const r = rating.trim().toUpperCase();
+  if (r === "A+" || r === "A") return { emoji: "⚡", kind: "high" };
+  if (r === "F" || r === "D-" || r === "D") return { emoji: "⁉️", kind: "low" };
+  return null;
+}
+
 function labelBadgeStyle(label: RatingLabel): {
   bg: string;
   color: string;
@@ -378,8 +422,16 @@ function IntroOverlay({
 }: Pick<StockRatingVideoProps, "stock" | "rating" | "label" | "score"> & {
   opacity: number;
 }) {
+  const mainFrame = useMainTimelineFrame();
   const badge = ratingBadgeTone(rating);
   const lb = labelBadgeStyle(label);
+  const headline = introHeadlineText(stock, rating);
+  const extreme = extremeIntroEmoji(rating);
+  const emojiWobble =
+    extreme != null
+      ? 0.06 * Math.sin((mainFrame / 30) * Math.PI * 2 * 2.2)
+      : 0;
+  const emojiScale = extreme != null ? 1 + emojiWobble : 1;
 
   return (
     <AbsoluteFill
@@ -391,7 +443,14 @@ function IntroOverlay({
         zIndex: 12,
       }}
     >
-      <div style={{ textAlign: "center", padding: 48 }}>
+      <div
+        style={{
+          textAlign: "center",
+          padding: 48,
+          maxWidth: 1100,
+          margin: "0 auto",
+        }}
+      >
         <div
           style={{
             width: 280,
@@ -422,14 +481,38 @@ function IntroOverlay({
           style={{
             fontFamily:
               'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-            fontSize: 48,
-            fontWeight: 700,
+            fontSize: 62,
+            fontWeight: 900,
             color: "#F8FAFC",
-            lineHeight: 1.2,
+            lineHeight: 1.22,
             marginBottom: 28,
+            letterSpacing: "-0.02em",
+            textShadow:
+              "0 2px 28px rgba(0,0,0,0.5), 0 0 1px rgba(248,250,252,0.2)",
           }}
         >
-          {stock} is rated {rating}
+          {headline}
+          {extreme ? (
+            <span
+              aria-hidden
+              style={{
+                display: "inline-block",
+                marginLeft: 10,
+                fontSize: 50,
+                lineHeight: 1,
+                verticalAlign: "middle",
+                transform: `scale(${emojiScale}) translateY(${emojiWobble * 6}px)`,
+                filter:
+                  extreme.kind === "high"
+                    ? "drop-shadow(0 0 14px rgba(250,204,21,0.45))"
+                    : "drop-shadow(0 0 12px rgba(248,113,113,0.4))",
+                opacity: 0.88 + emojiWobble * 0.25,
+                willChange: "transform, opacity",
+              }}
+            >
+              {extreme.emoji}
+            </span>
+          ) : null}
         </div>
         <div
           style={{

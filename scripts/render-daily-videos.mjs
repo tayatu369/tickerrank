@@ -34,7 +34,8 @@ const NETWORK_IDLE_NAV = Object.freeze({
   timeout: 90_000,
 });
 
-const POPULAR_STOCKS = ["AAPL", "NVDA", "TSLA", "MSFT", "AMZN"];
+/** Update this list weekly based on market volatility for better video engagement. */
+const POPULAR_STOCKS = ["TSLA", "PLTR", "MARA", "AAPL", "GME"];
 
 /** Same rules as scripts/generate-voiceover.mjs / lib/kv-safe.ts `resolveRestUrlToken`. */
 function trimEnv(name) {

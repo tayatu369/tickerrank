@@ -5,7 +5,8 @@
  * Loads .env.local first via dynamic imports, then resolves REST KV vs REDIS_URL (TCP).
  */
 
-const POPULAR_SYMBOLS = ["AAPL", "NVDA", "TSLA", "MSFT", "AMZN"];
+/** Update this list weekly based on market volatility for better video engagement. */
+const POPULAR_SYMBOLS = ["TSLA", "PLTR", "MARA", "AAPL", "GME"];
 
 const MODEL_ID = "eleven_multilingual_v2";
 const VOICES_BY_NAME = Object.freeze({
