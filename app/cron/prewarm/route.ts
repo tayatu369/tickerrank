@@ -1,12 +1,11 @@
 import { validateCronRequest } from "@/lib/automation/cron-secret";
 import { kvGetSafe } from "@/lib/kv-safe";
 import {
+  DAILY_PREWARM_SYMBOLS,
   getOrGenerateDailyCachedRating,
   utcDateKey,
 } from "@/lib/rating/daily-cached-rating";
 import { type NextRequest, NextResponse } from "next/server";
-
-const PREWARM_SYMBOLS = ["AAPL", "NVDA", "TSLA", "MSFT", "AMZN"] as const;
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -37,7 +36,7 @@ export async function GET(request: NextRequest) {
 
   const results: Record<string, PrewarmSymbolResult> = {};
 
-  for (const symbol of PREWARM_SYMBOLS) {
+  for (const symbol of DAILY_PREWARM_SYMBOLS) {
     const cacheKey = `rating:${symbol}:${cacheDate}`;
 
     let cached: unknown = null;
@@ -76,14 +75,14 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const succeeded = PREWARM_SYMBOLS.filter((s) => results[s]?.ok === true);
-  const failed = PREWARM_SYMBOLS.filter((s) => results[s]?.ok !== true);
+  const succeeded = DAILY_PREWARM_SYMBOLS.filter((s) => results[s]?.ok === true);
+  const failed = DAILY_PREWARM_SYMBOLS.filter((s) => results[s]?.ok !== true);
 
   return NextResponse.json({
     ok: true,
     cacheDate,
     kvTtlSeconds,
-    symbols: [...PREWARM_SYMBOLS],
+    symbols: [...DAILY_PREWARM_SYMBOLS],
     successCount: succeeded.length,
     failureCount: failed.length,
     succeeded,

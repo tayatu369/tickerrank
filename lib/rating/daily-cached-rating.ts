@@ -7,6 +7,21 @@ import type { QuoteSummaryResult } from "yahoo-finance2/modules/quoteSummary-ifa
 
 export const SYMBOL_NOT_FOUND =
   "Symbol not found. Please enter a valid US stock ticker.";
+
+/**
+ * Symbols pre-warmed by cron (`/api/cron/prewarm`) and kept in sync with
+ * `scripts/render-daily-videos.mjs` / `scripts/generate-voiceover.mjs`.
+ *
+ * Update this list weekly based on market volatility for better video engagement.
+ */
+export const DAILY_PREWARM_SYMBOLS = [
+  "TSLA",
+  "PLTR",
+  "MARA",
+  "AAPL",
+  "GME",
+] as const;
+
 const YAHOO_QUOTE_UNRECOGNIZED = "YAHOO_QUOTE_UNRECOGNIZED";
 
 export class SymbolNotFoundError extends Error {
