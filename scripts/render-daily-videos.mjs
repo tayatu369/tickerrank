@@ -171,6 +171,56 @@ function extractRatingPayload(cached) {
   return { rating, label, score, reason1, reason2 };
 }
 
+const POST_CAPTIONS_RELATIVE_LOG_PATH = "scripts/output/videos/post-captions.txt";
+
+/** Root marketing URL with UTM (platform-specific medium per channel copy). */
+function tickerrankWithUtm(source, medium, stockUpper) {
+  const c = encodeURIComponent(stockUpper);
+  return `https://tickerrank.com?utm_source=${source}&utm_medium=${medium}&utm_campaign=${c}`;
+}
+
+/**
+ * One symbol block for post-captions.txt (TikTok / YouTube Shorts / X).
+ * @param {{ stock: string; rating: string; label: string; reason1: string; reason2: string }} row
+ */
+function buildPostCaptionSection(row) {
+  const S = String(row.stock).trim().toUpperCase();
+  const rating = String(row.rating).trim();
+  const label = String(row.label).trim();
+  const r1 = String(row.reason1 ?? "").trim() || "—";
+  const r2 = String(row.reason2 ?? "").trim() || "—";
+  const urlTiktok = tickerrankWithUtm("tiktok", "video", S);
+  const urlYoutube = tickerrankWithUtm("youtube", "shorts", S);
+  const urlTwitter = tickerrankWithUtm("twitter", "video", S);
+
+  return [
+    `=== ${S} ===`,
+    "",
+    "--- TikTok ---",
+    `${S} rated ${rating} by AI 📊`,
+    `Check your stock at ${urlTiktok}`,
+    "#TickerRank #StockMarket #Investing #NFA",
+    "",
+    "--- YouTube Shorts ---",
+    `TickerRank AI just rated ${S} a ${rating} (${label}).`,
+    "Key reasons:",
+    "",
+    r1,
+    "",
+    r2,
+    "",
+    `Check your own stock rating at ${urlYoutube} — free 3 per day.`,
+    "Not financial advice. NFA.",
+    "",
+    "#TickerRank #AI #StockMarket #Investing #Shorts",
+    "",
+    "--- X (Twitter) ---",
+    `AI gives ${S} a ${rating}.`,
+    `Check your stocks free: ${urlTwitter}`,
+    "#TickerRank #NFA #Finance",
+  ].join("\n");
+}
+
 async function fileExists(p) {
   const fs = await import("node:fs/promises");
   try {
@@ -541,6 +591,8 @@ async function main() {
   let failed = 0;
   let skipped = 0;
   let browser = null;
+  /** Populated only when MP4 render succeeds (used for post-captions.txt). */
+  const captionRows = [];
 
   try {
     for (const symbol of POPULAR_STOCKS) {
@@ -647,6 +699,13 @@ async function main() {
         process.stdout.write("\n");
         rendered += 1;
         console.log(`[${symbol}] Done.`);
+        captionRows.push({
+          stock: symbol,
+          rating: payload.rating,
+          label: payload.label,
+          reason1: payload.reason1,
+          reason2: payload.reason2,
+        });
       } catch (err) {
         console.error(`[${symbol}] Render failed:`, err);
         failed += 1;
@@ -661,6 +720,20 @@ async function main() {
       }
     }
   }
+
+  const postCaptionsPath = path.join(outVideoDir, "post-captions.txt");
+  const todayDate = utcDateKey();
+  const captionsHeader = `TickerRank Post Captions — ${todayDate}`;
+  const captionsBody =
+    captionRows.length > 0
+      ? `\n\n${captionRows.map((row) => buildPostCaptionSection(row)).join("\n\n")}\n`
+      : "\n";
+  await fs.writeFile(
+    postCaptionsPath,
+    `${captionsHeader}${captionsBody}`,
+    "utf8",
+  );
+  console.log(`Post captions written to ${POST_CAPTIONS_RELATIVE_LOG_PATH}`);
 
   console.log(
     `\nSummary — rendered: ${rendered}, failed: ${failed}, skipped: ${skipped}`,
