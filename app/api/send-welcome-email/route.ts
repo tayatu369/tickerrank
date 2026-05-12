@@ -1,6 +1,28 @@
 import { validateInternalApiRequest } from "@/lib/automation/internal-api-secret";
+import { kvGetSafe, kvSetSafe } from "@/lib/kv-safe";
 import { type NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+
+const WELCOME_EMAIL_KV_TTL_SEC = 3600;
+
+function welcomeEmailSentKey(email: string): string {
+  return `welcome-email-sent:${email.toLowerCase()}`;
+}
+
+function wasWelcomeEmailSentRecently(stored: unknown): boolean {
+  if (stored == null || stored === "") return false;
+  const raw =
+    typeof stored === "string"
+      ? stored
+      : typeof stored === "number"
+        ? String(stored)
+        : null;
+  if (raw == null) return false;
+  const ts = Number(raw);
+  if (!Number.isFinite(ts)) return false;
+  const ageMs = Date.now() - ts;
+  return ageMs >= 0 && ageMs < WELCOME_EMAIL_KV_TTL_SEC * 1000;
+}
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -233,6 +255,19 @@ export async function POST(request: NextRequest) {
 
   const { email, name } = parsed;
 
+  const kvKey = welcomeEmailSentKey(email);
+  const existingSent = await kvGetSafe(kvKey);
+  if (wasWelcomeEmailSentRecently(existingSent)) {
+    return NextResponse.json(
+      {
+        ok: true,
+        skipped: true,
+        reason: "Already sent recently",
+      },
+      { status: 200 },
+    );
+  }
+
   const from = resolveResendFrom();
 
   const origin = resolveSiteOrigin();
@@ -259,6 +294,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: typeof error.message === "string" ? error.message : "Send failed" },
         { status: 500 },
+      );
+    }
+
+    const stored = await kvSetSafe(kvKey, String(Date.now()), {
+      ex: WELCOME_EMAIL_KV_TTL_SEC,
+    });
+    if (!stored) {
+      console.warn(
+        "[send-welcome-email] Email sent but KV idempotency key was not stored",
+        { kvKey },
       );
     }
 
