@@ -1,33 +1,6 @@
 import { validateInternalApiRequest } from "@/lib/automation/internal-api-secret";
-import { kvGetSafe, kvSetSafe } from "@/lib/kv-safe";
 import { type NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
-
-const WELCOME_EMAIL_KV_TTL_SEC = 3600;
-
-const IN_MEMORY_WELCOME_DEDUPE_MS = 60_000;
-
-/** Same-instance dedupe: email → last successful send time (ms). */
-const recentEmails = new Map<string, number>();
-
-function welcomeEmailSentKey(email: string): string {
-  return `welcome-email-sent:${email.toLowerCase()}`;
-}
-
-function wasWelcomeEmailSentRecently(stored: unknown): boolean {
-  if (stored == null || stored === "") return false;
-  const raw =
-    typeof stored === "string"
-      ? stored
-      : typeof stored === "number"
-        ? String(stored)
-        : null;
-  if (raw == null) return false;
-  const ts = Number(raw);
-  if (!Number.isFinite(ts)) return false;
-  const ageMs = Date.now() - ts;
-  return ageMs >= 0 && ageMs < WELCOME_EMAIL_KV_TTL_SEC * 1000;
-}
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -260,46 +233,6 @@ export async function POST(request: NextRequest) {
 
   const { email, name } = parsed;
 
-  const emailDedupeKey = email.toLowerCase();
-
-  const memorySentAt = recentEmails.get(emailDedupeKey);
-  if (
-    memorySentAt !== undefined &&
-    Date.now() - memorySentAt < IN_MEMORY_WELCOME_DEDUPE_MS
-  ) {
-    console.log("[send-welcome-email] in-memory dedupe skip", {
-      email: emailDedupeKey,
-      ageMs: Date.now() - memorySentAt,
-    });
-    return NextResponse.json(
-      {
-        ok: true,
-        skipped: true,
-        reason: "Already sent (in-memory)",
-      },
-      { status: 200 },
-    );
-  }
-
-  const kvKey = welcomeEmailSentKey(email);
-  console.log("[send-welcome-email] KV read start", { kvKey });
-  const existingSent = await kvGetSafe(kvKey);
-  console.log("[send-welcome-email] KV read done", {
-    kvKey,
-    hasValue: existingSent != null && existingSent !== "",
-    recent: wasWelcomeEmailSentRecently(existingSent),
-  });
-  if (wasWelcomeEmailSentRecently(existingSent)) {
-    return NextResponse.json(
-      {
-        ok: true,
-        skipped: true,
-        reason: "Already sent recently",
-      },
-      { status: 200 },
-    );
-  }
-
   const from = resolveResendFrom();
 
   const origin = resolveSiteOrigin();
@@ -312,43 +245,23 @@ export async function POST(request: NextRequest) {
     logoUrl,
   });
 
+  const welcomeSend = {
+    from,
+    to: email,
+    subject: "Welcome to TickerRank Pro!",
+    html,
+    idempotencyKey: `welcome-${email.toLowerCase().trim()}`,
+  };
+
   try {
     const resend = new Resend(apiKey);
-    console.log("[send-welcome-email] Resend send start", {
-      to: emailDedupeKey,
-    });
-    const { error } = await resend.emails.send({
-      from,
-      to: email,
-      subject: "Welcome to TickerRank Pro!",
-      html,
-    });
+    const { error } = await resend.emails.send(welcomeSend);
 
     if (error) {
       console.error("[send-welcome-email] Resend error", error);
       return NextResponse.json(
         { error: typeof error.message === "string" ? error.message : "Send failed" },
         { status: 500 },
-      );
-    }
-
-    console.log("[send-welcome-email] Resend send ok", { to: emailDedupeKey });
-
-    recentEmails.set(emailDedupeKey, Date.now());
-
-    console.log("[send-welcome-email] KV write start", {
-      kvKey,
-      ttlSec: WELCOME_EMAIL_KV_TTL_SEC,
-    });
-    const stored = await kvSetSafe(kvKey, String(Date.now()), {
-      ex: WELCOME_EMAIL_KV_TTL_SEC,
-    });
-    console.log("[send-welcome-email] KV write done", { kvKey, ok: stored });
-
-    if (!stored) {
-      console.warn(
-        "[send-welcome-email] Email sent but KV idempotency key was not stored",
-        { kvKey },
       );
     }
 
