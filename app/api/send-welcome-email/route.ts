@@ -138,6 +138,34 @@ function readWelcomePayload(body: unknown):
   return { ok: true, email, name };
 }
 
+const DEFAULT_RESEND_FROM = "TickerRank <noreply@tickerrank.com>";
+
+/**
+ * Resend shows a broken label (e.g. "noreply noreply@…") if `from` is only a bare email.
+ * Accepts `Display Name <addr>` or a bare email (wrapped as TickerRank).
+ */
+function resolveResendFrom(): string {
+  const raw = process.env.RESEND_FROM_EMAIL?.trim();
+  if (!raw) return DEFAULT_RESEND_FROM;
+
+  const withAngles = /^(.+?)\s*<\s*([^\s<>]+@[^\s<>]+)\s*>$/.exec(raw);
+  if (withAngles) {
+    const display = withAngles[1].trim();
+    const addr = withAngles[2].trim();
+    return `${display} <${addr}>`;
+  }
+
+  if (/^[^\s<>]+@[^\s<>]+$/.test(raw)) {
+    return `TickerRank <${raw}>`;
+  }
+
+  console.warn(
+    "[send-welcome-email] RESEND_FROM_EMAIL must be 'Display Name <email@domain>' or a bare email; using default sender",
+    { raw },
+  );
+  return DEFAULT_RESEND_FROM;
+}
+
 export async function POST(request: NextRequest) {
   const denied = validateInternalApiRequest(request);
   if (denied) return denied;
@@ -205,9 +233,7 @@ export async function POST(request: NextRequest) {
 
   const { email, name } = parsed;
 
-  const from =
-    process.env.RESEND_FROM_EMAIL?.trim() ??
-    "TickerRank <noreply@tickerrank.com>";
+  const from = resolveResendFrom();
 
   const origin = resolveSiteOrigin();
   const dashboardUrl = `${origin}/dashboard`;
