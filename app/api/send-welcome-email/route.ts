@@ -101,6 +101,43 @@ function buildWelcomeEmailHtml(opts: {
 </html>`;
 }
 
+function stripLeadingBom(s: string): string {
+  return s.startsWith("\uFEFF") ? s.slice(1) : s;
+}
+
+function readWelcomePayload(body: unknown):
+  | { ok: true; email: string; name: string }
+  | { ok: false; message: string } {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return { ok: false, message: "JSON body must be an object" };
+  }
+
+  const o = body as Record<string, unknown>;
+
+  if (!("email" in o)) {
+    return { ok: false, message: "email is required" };
+  }
+
+  const emailRaw = o.email;
+  if (typeof emailRaw !== "string") {
+    return { ok: false, message: "email must be a string" };
+  }
+  const email = emailRaw.trim();
+  if (!email) {
+    return { ok: false, message: "email is required" };
+  }
+
+  let name = "";
+  if ("name" in o && o.name !== undefined && o.name !== null) {
+    if (typeof o.name !== "string") {
+      return { ok: false, message: "name must be a string when provided" };
+    }
+    name = o.name.trim();
+  }
+
+  return { ok: true, email, name };
+}
+
 export async function POST(request: NextRequest) {
   const denied = validateInternalApiRequest(request);
   if (denied) return denied;
@@ -114,32 +151,59 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let rawBody: string;
+  try {
+    rawBody = await request.text();
+  } catch (readErr) {
+    console.error("[send-welcome-email] Failed to read request body", readErr);
+    return NextResponse.json(
+      { error: "Could not read request body" },
+      { status: 400 },
+    );
+  }
+
+  const trimmed = stripLeadingBom(rawBody.trim());
+  if (!trimmed) {
+    console.error("[send-welcome-email] Empty request body after trim");
+    return NextResponse.json(
+      { error: "Request body is required" },
+      { status: 400 },
+    );
+  }
+
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
+    body = JSON.parse(trimmed);
+  } catch (parseErr) {
+    const maxPreview = 2048;
+    const preview =
+      trimmed.length > maxPreview
+        ? `${trimmed.slice(0, maxPreview)}…(truncated, total ${trimmed.length} chars)`
+        : trimmed;
+    console.error("[send-welcome-email] JSON.parse failed", {
+      error:
+        parseErr instanceof Error
+          ? { name: parseErr.name, message: parseErr.message }
+          : String(parseErr),
+      contentLength: trimmed.length,
+      bodyPreview: preview,
+    });
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const email =
-    body &&
-    typeof body === "object" &&
-    "email" in body &&
-    typeof (body as { email?: unknown }).email === "string"
-      ? (body as { email: string }).email.trim()
-      : "";
-
-  const name =
-    body &&
-    typeof body === "object" &&
-    "name" in body &&
-    typeof (body as { name?: unknown }).name === "string"
-      ? (body as { name: string }).name
-      : "";
-
-  if (!email) {
-    return NextResponse.json({ error: "email is required" }, { status: 400 });
+  const parsed = readWelcomePayload(body);
+  if (!parsed.ok) {
+    console.error("[send-welcome-email] Invalid payload fields", {
+      message: parsed.message,
+      keys:
+        body && typeof body === "object" && !Array.isArray(body)
+          ? Object.keys(body as object)
+          : [],
+    });
+    return NextResponse.json({ error: parsed.message }, { status: 400 });
   }
+
+  const { email, name } = parsed;
 
   const from =
     process.env.RESEND_FROM_EMAIL?.trim() ??
