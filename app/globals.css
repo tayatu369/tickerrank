@@ -18,3 +18,21 @@ body {
 body {
   color: var(--foreground);
 }
+
+@keyframes rate-it-hover-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 12px 28px -8px rgb(59 130 246 / 0.4),
+      0 0 0 0 rgb(59 130 246 / 0.35);
+  }
+  50% {
+    box-shadow:
+      0 16px 36px -10px rgb(59 130 246 / 0.55),
+      0 0 0 10px rgb(59 130 246 / 0.08);
+  }
+}
+
+.rate-it-cta:hover {
+  animation: rate-it-hover-pulse 1.35s ease-in-out infinite;
+}

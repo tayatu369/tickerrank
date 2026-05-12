@@ -28,6 +28,56 @@ async function resolveClerkUserIdForSubscription(
   return cm.clerk_user_id ?? cm.clerkUserId ?? null;
 }
 
+/** Base URL for calling same-deployment API routes (VERCEL_URL has no scheme). */
+function resolveInternalApiOrigin(): string {
+  const vercel = process.env.VERCEL_URL?.trim();
+  if (vercel) {
+    const host = vercel.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+    return `https://${host}`;
+  }
+  return "https://tickerrank.com";
+}
+
+async function sendWelcomeEmailSafe(email: string, name: string): Promise<void> {
+  const secret = process.env.INTERNAL_API_SECRET?.trim();
+  if (!secret) {
+    console.error(
+      "[stripe-webhook] INTERNAL_API_SECRET is not set; skipping welcome email",
+    );
+    return;
+  }
+
+  const origin = resolveInternalApiOrigin();
+  const url = `${origin}/api/send-welcome-email`;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${secret}`,
+      },
+      body: JSON.stringify({ email, name }),
+    });
+
+    if (!res.ok) {
+      let detail = "";
+      try {
+        detail = await res.text();
+      } catch {
+        /* ignore */
+      }
+      console.error(
+        "[stripe-webhook] Welcome email request failed",
+        res.status,
+        detail.slice(0, 500),
+      );
+    }
+  } catch (err) {
+    console.error("[stripe-webhook] Welcome email fetch error", err);
+  }
+}
+
 export async function POST(request: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
   if (!webhookSecret) {
@@ -79,6 +129,17 @@ export async function POST(request: NextRequest) {
         await client.users.updateUser(userId, {
           publicMetadata: { subscription: "pro" },
         });
+
+        const email = session.customer_details?.email?.trim();
+        const name = session.customer_details?.name?.trim() ?? "";
+        if (email) {
+          await sendWelcomeEmailSafe(email, name);
+        } else {
+          console.warn(
+            "[stripe-webhook] checkout.session.completed: no customer_details.email; skipping welcome email",
+            session.id,
+          );
+        }
         break;
       }
       case "customer.subscription.deleted": {

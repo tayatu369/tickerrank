@@ -42,27 +42,34 @@ export default function Home() {
           <form
             action="/rating"
             method="get"
-            className="mx-auto mt-10 flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:items-stretch"
+            className="mx-auto mt-10 flex w-full max-w-xl flex-col gap-2"
           >
-            <label className="sr-only" htmlFor="symbol">
-              Stock ticker symbol
-            </label>
-            <input
-              id="symbol"
-              name="symbol"
-              type="text"
-              required
-              autoComplete="off"
-              autoCapitalize="characters"
-              placeholder="Enter ticker, e.g. AAPL"
-              className="min-h-12 w-full flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white placeholder:text-slate-500 outline-none ring-[#3B82F6] transition-[box-shadow,border-color] focus:border-[#3B82F6]/50 focus:ring-2"
-            />
-            <button
-              type="submit"
-              className="min-h-12 shrink-0 rounded-xl bg-[#3B82F6] px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#3B82F6]/25 transition-colors hover:bg-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6] sm:w-auto"
-            >
-              Rate It
-            </button>
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-stretch">
+              <label className="sr-only" htmlFor="symbol">
+                Stock ticker symbol
+              </label>
+              <div className="w-full flex-1 min-w-0 rounded-xl bg-gradient-to-r from-[#3B82F6]/50 via-sky-400/35 to-[#2563EB]/50 p-px shadow-[0_0_28px_rgba(59,130,246,0.14)]">
+                <input
+                  id="symbol"
+                  name="symbol"
+                  type="text"
+                  required
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  placeholder="Enter ticker, e.g. AAPL"
+                  className="h-full min-h-12 w-full rounded-[11px] border border-transparent bg-[#0B1120] px-4 py-3 text-lg text-white placeholder:text-slate-500 outline-none ring-[#3B82F6] transition-[box-shadow] focus:shadow-[0_0_0_2px_rgba(59,130,246,0.35)] focus:ring-2 focus:ring-[#3B82F6]/45"
+                />
+              </div>
+              <button
+                type="submit"
+                className="rate-it-cta min-h-14 shrink-0 rounded-xl bg-[#3B82F6] px-10 py-3.5 text-lg font-semibold text-white shadow-lg shadow-[#3B82F6]/25 transition-colors hover:bg-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6] sm:w-auto sm:self-stretch"
+              >
+                Rate It
+              </button>
+            </div>
+            <p className="text-pretty text-center text-xs leading-relaxed text-slate-500 sm:text-left">
+              Try AAPL, TSLA, or any US stock — free 3 per day
+            </p>
           </form>
         </div>
 

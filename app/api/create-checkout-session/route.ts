@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       client_reference_id: userId,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/pricing`,
+      cancel_url: `${origin}/payment-failed?reason=card_declined`,
     });
 
     if (!session.url) {

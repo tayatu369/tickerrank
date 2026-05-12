@@ -1,105 +1,56 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { SiteFooter } from "../components/site-footer";
-import { SiteHeader } from "../components/site-header";
 
-const PORTAL_MESSAGE =
-  "Customer Portal will be available once the project is deployed to Vercel and connected to Stripe's live environment.";
+function alertSignInError(err: unknown): void {
+  const msg = err instanceof Error ? err.message : String(err);
+  window.alert(`Sign-in could not open: ${msg}`);
+}
 
-function PortalModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+function triggerSignIn(openSignIn: () => unknown): void {
+  try {
+    const result = openSignIn();
+    if (
+      result != null &&
+      typeof (result as PromiseLike<unknown>).then === "function"
+    ) {
+      void (result as PromiseLike<unknown>).then(undefined, alertSignInError);
+    }
+  } catch (err) {
+    alertSignInError(err);
+  }
+}
 
-  if (!open) return null;
-
+function SuccessCheckIcon({ className }: { className?: string }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center p-4 pb-8 sm:items-center sm:p-6"
-      role="presentation"
+    <svg
+      className={className}
+      viewBox="0 0 120 120"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
     >
-      <button
-        type="button"
-        className="absolute inset-0 bg-[#0B1120]/80 backdrop-blur-sm"
-        aria-label="Close dialog"
-        onClick={onClose}
+      <circle cx="60" cy="60" r="56" stroke="currentColor" strokeWidth="4" />
+      <path
+        d="M34 62l18 18 34-44"
+        stroke="currentColor"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
-      <div
-        className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[#111827] p-5 shadow-2xl shadow-black/40 sm:p-6"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="portal-modal-title"
-      >
-        <h2
-          id="portal-modal-title"
-          className="text-lg font-semibold text-white"
-        >
-          Manage subscription
-        </h2>
-        <p className="mt-3 text-sm leading-relaxed text-slate-300">
-          {PORTAL_MESSAGE}
-        </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-6 w-full min-h-11 rounded-xl bg-[#3B82F6] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6]"
-        >
-          Got it
-        </button>
-      </div>
-    </div>
+    </svg>
   );
 }
 
 function SuccessInner() {
   const searchParams = useSearchParams();
   const { user, isLoaded } = useUser();
-  const [portalOpen, setPortalOpen] = useState(false);
-  const [syncLoading, setSyncLoading] = useState(false);
-  const [syncError, setSyncError] = useState<string | null>(null);
-  const [syncSuccess, setSyncSuccess] = useState(false);
+  const { openSignIn } = useClerk();
 
   void searchParams.get("session_id");
-
-  const handleSyncPro = useCallback(async () => {
-    if (!user) return;
-    setSyncError(null);
-    setSyncSuccess(false);
-    setSyncLoading(true);
-    try {
-      const res = await fetch("/api/sync-pro-status", { method: "POST" });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok) {
-        setSyncError(data.error ?? `Request failed (${res.status})`);
-        return;
-      }
-      await user.reload();
-      setSyncSuccess(true);
-    } catch (e) {
-      setSyncError(
-        e instanceof Error ? e.message : "Something went wrong. Try again.",
-      );
-    } finally {
-      setSyncLoading(false);
-    }
-  }, [user]);
-
-  const closePortal = useCallback(() => setPortalOpen(false), []);
 
   if (!isLoaded) {
     return (
@@ -111,91 +62,66 @@ function SuccessInner() {
 
   if (!user) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-4 py-16 text-center">
-        <p className="max-w-md text-base leading-relaxed text-slate-300">
-          Please sign in to view your subscription.
-        </p>
-        <Link
-          href="/"
-          className="mt-6 inline-flex min-h-12 items-center justify-center rounded-xl bg-[#3B82F6] px-6 text-base font-semibold text-white transition-colors hover:bg-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6]"
-        >
-          Back to home
-        </Link>
+      <div className="flex flex-1 flex-col items-center justify-center px-4 py-12 text-center sm:py-16">
+        <div className="w-full max-w-md">
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            Sign in to continue
+          </h1>
+          <p className="mt-4 text-pretty text-base leading-relaxed text-slate-400">
+            Your payment succeeded. Sign in with the same account you used at
+            checkout so we can link your TickerRank Pro subscription.
+          </p>
+          <button
+            type="button"
+            onClick={() => triggerSignIn(openSignIn)}
+            className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#3B82F6] px-6 text-base font-semibold text-white shadow-lg shadow-[#3B82F6]/25 transition-colors hover:bg-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6] sm:w-auto sm:min-w-[200px]"
+          >
+            Sign in
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="flex flex-1 flex-col items-center justify-center px-4 py-12 sm:py-16">
-        <div className="w-full max-w-lg text-center">
-          <div
-            className="text-5xl sm:text-6xl"
-            role="img"
-            aria-label="Success"
+    <div className="flex flex-1 flex-col items-center justify-center px-4 py-12 text-center sm:py-16">
+      <div className="w-full max-w-md">
+        <div
+          className="flex justify-center"
+          role="img"
+          aria-label="Subscription successful"
+        >
+          <SuccessCheckIcon className="h-24 w-24 text-emerald-400 sm:h-28 sm:w-28" />
+        </div>
+        <h1 className="mt-8 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+          Welcome to TickerRank Pro!
+        </h1>
+        <p className="mt-4 text-pretty text-base leading-relaxed text-slate-400 sm:text-lg">
+          Your subscription is now active. You have unlimited ratings, full AI
+          insights, and news sentiment analysis.
+        </p>
+        <div className="mt-10 flex w-full flex-col gap-3">
+          <Link
+            href="/dashboard"
+            className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#3B82F6] px-6 text-base font-semibold text-white shadow-lg shadow-[#3B82F6]/25 transition-colors hover:bg-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6]"
           >
-            ✅
-          </div>
-          <h1 className="mt-6 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Subscription Confirmed!
-          </h1>
-          <p className="mt-4 text-pretty text-base leading-relaxed text-slate-400 sm:text-lg">
-            You now have access to TickerRank Pro features. Enjoy unlimited
-            ratings, full AI insights, and more.
-          </p>
-
-          {syncSuccess ? (
-            <p
-              className="mx-auto mt-6 max-w-md rounded-xl border border-emerald-400/35 bg-emerald-500/15 px-4 py-3 text-sm font-medium text-emerald-200"
-              role="status"
-            >
-              Pro status activated!
-            </p>
-          ) : null}
-          {syncError ? (
-            <p
-              className="mx-auto mt-6 max-w-md rounded-xl border border-rose-400/35 bg-rose-500/15 px-4 py-3 text-sm text-rose-100"
-              role="alert"
-            >
-              {syncError}
-            </p>
-          ) : null}
-
-          <div className="mt-10 flex w-full flex-col gap-3 sm:mx-auto sm:max-w-md">
-            <Link
-              href="/"
-              className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#3B82F6] px-6 text-base font-semibold text-white shadow-lg shadow-[#3B82F6]/20 transition-colors hover:bg-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6]"
-            >
-              Go to Rating
-            </Link>
-            <button
-              type="button"
-              onClick={() => setPortalOpen(true)}
-              className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-[#3B82F6]/40 bg-transparent px-6 text-base font-semibold text-[#93C5FD] transition-colors hover:border-[#3B82F6]/60 hover:bg-[#3B82F6]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6]"
-            >
-              Manage Subscription
-            </button>
-            <button
-              type="button"
-              onClick={handleSyncPro}
-              disabled={syncLoading}
-              className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-white/15 bg-white/[0.04] px-6 text-base font-semibold text-slate-200 transition-colors hover:bg-white/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6] disabled:pointer-events-none disabled:opacity-50"
-            >
-              {syncLoading ? "Syncing…" : "Manually Sync Pro Status"}
-            </button>
-          </div>
+            Go to Dashboard
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-[#3B82F6]/45 bg-transparent px-6 text-base font-semibold text-[#93C5FD] transition-colors hover:border-[#3B82F6] hover:bg-[#3B82F6]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6]"
+          >
+            Rate Your First Stock
+          </Link>
         </div>
       </div>
-      <PortalModal open={portalOpen} onClose={closePortal} />
-    </>
+    </div>
   );
 }
 
 export default function SuccessPage() {
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-[#0B1120] text-slate-100">
-      <SiteHeader />
-
+    <div className="flex min-h-[100dvh] flex-col bg-[#0B1120] text-slate-100">
       <Suspense
         fallback={
           <div className="flex flex-1 flex-col items-center justify-center px-4 py-16">
@@ -206,7 +132,14 @@ export default function SuccessPage() {
         <SuccessInner />
       </Suspense>
 
-      <SiteFooter />
+      <footer className="mt-auto px-4 pb-8 pt-4 text-center">
+        <a
+          href="mailto:support@tickerrank.com"
+          className="text-xs text-slate-500 transition-colors hover:text-[#3B82F6]"
+        >
+          Need help? support@tickerrank.com
+        </a>
+      </footer>
     </div>
   );
 }
