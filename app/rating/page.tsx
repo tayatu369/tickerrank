@@ -11,6 +11,7 @@ import {
   RatingHistoryChart,
   type RatingHistoryPoint,
 } from "@/components/RatingHistoryChart";
+import { ShareScorecard } from "@/components/ShareScorecard";
 import { recordRecentSymbol } from "@/lib/recent-queries";
 
 type RatingApiResponse = {
@@ -999,6 +1000,10 @@ function RatingDetails({
                 </li>
               </ul>
             </section>
+
+            <div className="mt-10">
+              <ShareScorecard symbol={symbol} rating={data.rating} />
+            </div>
           </div>
         ) : null}
       </div>

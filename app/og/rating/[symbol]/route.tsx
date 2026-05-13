@@ -10,6 +10,39 @@ export const runtime = "nodejs";
 
 const BG = "#0B1120";
 const ACCENT = "#3B82F6";
+const CTA_GRAY = "#94a3b8";
+
+function OgImageFooter() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+        flexShrink: 0,
+        paddingTop: 28,
+        gap: 10,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          borderTop: "1px solid rgba(148, 163, 184, 0.22)",
+        }}
+      />
+      <div
+        style={{
+          fontSize: 10,
+          color: CTA_GRAY,
+          lineHeight: 1.35,
+          letterSpacing: "0.02em",
+        }}
+      >
+        Full analysis & more stock ratings → tickerrank.com
+      </div>
+    </div>
+  );
+}
 
 function reason1FromCached(cached: Record<string, unknown>): string {
   if (cached.reason1 != null) return String(cached.reason1).trim();
@@ -143,6 +176,7 @@ export async function GET(
               Rating unavailable
             </div>
           </div>
+          <OgImageFooter />
         </div>
       ),
       {
@@ -261,6 +295,7 @@ export async function GET(
             {reason1 || "—"}
           </div>
         </div>
+        <OgImageFooter />
       </div>
     ),
     {

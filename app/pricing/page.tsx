@@ -26,6 +26,7 @@ const PRO_FEATURES_CORE = [
 const PRO_FEATURES_PORTFOLIO = [
   "Portfolio Health Score",
   "Risk Assessment",
+  "Portfolio analysis (AI-generated strengths & weaknesses)",
   "AI-generated portfolio tips",
 ] as const;
 
