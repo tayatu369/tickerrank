@@ -2,7 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, startTransition } from "react";
 import { SiteFooter } from "../components/site-footer";
 import { SiteHeader } from "../components/site-header";
 
@@ -22,6 +22,13 @@ type RatingApiResponse = {
     Value: number;
     Sentiment: number;
   };
+};
+
+type PortfolioAnalysis = {
+  strengths: string[];
+  weaknesses: string[];
+  riskLevel: "Low" | "Medium" | "High";
+  riskExplanation: string;
 };
 
 type PortfolioRow = { symbol: string; data: RatingApiResponse };
@@ -87,6 +94,19 @@ function assessPortfolioRisk(rows: PortfolioRow[]): {
   };
 }
 
+function aiPortfolioRiskCardClass(
+  level: "Low" | "Medium" | "High",
+): string {
+  switch (level) {
+    case "High":
+      return "border-red-500/40 bg-red-500/15 text-red-200";
+    case "Medium":
+      return "border-amber-500/40 bg-amber-500/15 text-amber-100";
+    default:
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
+  }
+}
+
 function PortfolioGauge({ score }: { score: number }) {
   const s = Math.min(100, Math.max(0, score));
   const color = scoreGaugeColor(s);
@@ -144,6 +164,9 @@ export default function PortfolioPage() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<PortfolioError[]>([]);
   const [rows, setRows] = useState<PortfolioRow[] | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<PortfolioAnalysis | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const addTicker = useCallback(
     (raw: string) => {
@@ -224,6 +247,8 @@ export default function PortfolioPage() {
 
     setErrors(bad);
     setRows(okRows.length > 0 ? okRows : null);
+    setAiAnalysis(null);
+    setAiError(null);
     setLoading(false);
   };
 
@@ -241,6 +266,66 @@ export default function PortfolioPage() {
       : risk?.tone === "moderate"
         ? "border-amber-500/40 bg-amber-500/15 text-amber-100"
         : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
+
+  useEffect(() => {
+    if (!userLoaded || !isPro || !rows?.length) {
+      startTransition(() => {
+        setAiAnalysis(null);
+        setAiLoading(false);
+        setAiError(null);
+      });
+      return;
+    }
+
+    let cancelled = false;
+    startTransition(() => {
+      setAiLoading(true);
+      setAiError(null);
+      setAiAnalysis(null);
+    });
+
+    const payload = {
+      holdings: rows.map((r) => ({
+        symbol: r.symbol,
+        companyName: r.data.companyName,
+        rating: r.data.rating,
+        score: r.data.score,
+        conclusion: r.data.conclusion,
+        reasons: r.data.reasons,
+        metrics: r.data.metrics,
+      })),
+    };
+
+    void fetch("/api/portfolio-analysis", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(async (res) => {
+        const j = (await res.json()) as PortfolioAnalysis & { error?: string };
+        if (!res.ok) {
+          const msg =
+            typeof j.error === "string" ? j.error : `Request failed (${res.status})`;
+          throw new Error(msg);
+        }
+        return j as PortfolioAnalysis;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setAiAnalysis(data);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setAiError(e instanceof Error ? e.message : "Analysis failed");
+      })
+      .finally(() => {
+        if (!cancelled) setAiLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userLoaded, isPro, rows]);
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-[#0B1120] text-slate-100">
@@ -367,64 +452,72 @@ export default function PortfolioPage() {
               </div>
             </div>
 
-            <div className="relative mt-2">
-              <div
-                className={!isPro ? "select-none blur-md" : ""}
-                aria-hidden={!isPro}
+            <section
+              className="relative mt-8 min-h-[220px] overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 sm:p-7"
+              aria-labelledby="portfolio-ai-heading"
+            >
+              <h3
+                id="portfolio-ai-heading"
+                className="text-sm font-semibold uppercase tracking-wider text-slate-400"
               >
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
-                  Holdings breakdown
-                </h3>
-                <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10">
-                  <table className="w-full min-w-[520px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-white/10 text-xs uppercase tracking-wider text-slate-500">
-                        <th className="px-4 py-3 font-semibold">Symbol</th>
-                        <th className="px-4 py-3 font-semibold">Rating</th>
-                        <th className="px-4 py-3 font-semibold">Score</th>
-                        <th className="px-4 py-3 font-semibold">Conclusion</th>
-                        <th className="px-4 py-3 font-semibold">
-                          Metric snapshot
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((r) => (
-                        <tr
-                          key={r.symbol}
-                          className="border-b border-white/5 last:border-0"
-                        >
-                          <td className="px-4 py-3 font-mono font-semibold text-white">
-                            {r.symbol}
-                          </td>
-                          <td className="px-4 py-3 text-[#93C5FD]">
-                            {r.data.rating}
-                          </td>
-                          <td className="px-4 py-3 tabular-nums text-slate-300">
-                            {Math.round(r.data.score)}
-                          </td>
-                          <td className="px-4 py-3 text-slate-300">
-                            {r.data.conclusion}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-400">
-                            G{" "}
-                            {Math.round(r.data.metrics.Growth)} · H{" "}
-                            {Math.round(r.data.metrics.FinancialHealth)} · M{" "}
-                            {Math.round(r.data.metrics.Momentum)} · V{" "}
-                            {Math.round(r.data.metrics.Value)} · S{" "}
-                            {Math.round(r.data.metrics.Sentiment)}
-                          </td>
-                        </tr>
+                Portfolio Analysis
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                AI-generated strengths, weaknesses, and risk view from your
+                rated holdings.
+              </p>
+
+              {isPro && aiLoading ? (
+                <p className="mt-8 text-sm text-slate-400" aria-live="polite">
+                  Generating portfolio analysis…
+                </p>
+              ) : null}
+              {isPro && aiError ? (
+                <p className="mt-6 text-sm text-rose-300" role="alert">
+                  {aiError}
+                </p>
+              ) : null}
+              {isPro && !aiLoading && aiAnalysis ? (
+                <div className="mt-6 space-y-6">
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-emerald-300/90">
+                      Strengths
+                    </h4>
+                    <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-slate-300">
+                      {aiAnalysis.strengths.map((s, i) => (
+                        <li key={`s-${i}`}>{s}</li>
                       ))}
-                    </tbody>
-                  </table>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-amber-200/90">
+                      Weaknesses
+                    </h4>
+                    <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-slate-300">
+                      {aiAnalysis.weaknesses.map((s, i) => (
+                        <li key={`w-${i}`}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div
+                    className={`rounded-xl border p-4 sm:p-5 ${aiPortfolioRiskCardClass(aiAnalysis.riskLevel)}`}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wider opacity-90">
+                      Risk level (AI)
+                    </p>
+                    <p className="mt-2 text-lg font-bold">{aiAnalysis.riskLevel}</p>
+                    <p className="mt-2 text-sm leading-relaxed opacity-95">
+                      {aiAnalysis.riskExplanation}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               {!isPro ? (
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-[#0B1120]/55 px-6 text-center">
-                  <p className="pointer-events-auto max-w-md text-sm font-medium leading-snug text-slate-200">
-                    Upgrade to Pro for deep portfolio analysis
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#0B1120]/60 px-6 text-center backdrop-blur-[8px]">
+                  <p className="pointer-events-auto max-w-md text-sm font-medium leading-snug text-slate-100">
+                    Upgrade to Pro for AI portfolio analysis — strengths,
+                    weaknesses, and risk summary.
                   </p>
                   <Link
                     href="/pricing"
@@ -434,6 +527,55 @@ export default function PortfolioPage() {
                   </Link>
                 </div>
               ) : null}
+            </section>
+
+            <div className="mt-10">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+                Holdings breakdown
+              </h3>
+              <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10">
+                <table className="w-full min-w-[520px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-xs uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3 font-semibold">Symbol</th>
+                      <th className="px-4 py-3 font-semibold">Rating</th>
+                      <th className="px-4 py-3 font-semibold">Score</th>
+                      <th className="px-4 py-3 font-semibold">Conclusion</th>
+                      <th className="px-4 py-3 font-semibold">
+                        Metric snapshot
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr
+                        key={r.symbol}
+                        className="border-b border-white/5 last:border-0"
+                      >
+                        <td className="px-4 py-3 font-mono font-semibold text-white">
+                          {r.symbol}
+                        </td>
+                        <td className="px-4 py-3 text-[#93C5FD]">
+                          {r.data.rating}
+                        </td>
+                        <td className="px-4 py-3 tabular-nums text-slate-300">
+                          {Math.round(r.data.score)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-300">
+                          {r.data.conclusion}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-400">
+                          G {Math.round(r.data.metrics.Growth)} · H{" "}
+                          {Math.round(r.data.metrics.FinancialHealth)} · M{" "}
+                          {Math.round(r.data.metrics.Momentum)} · V{" "}
+                          {Math.round(r.data.metrics.Value)} · S{" "}
+                          {Math.round(r.data.metrics.Sentiment)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
         ) : null}

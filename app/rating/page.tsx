@@ -876,7 +876,11 @@ function RatingDetails({
             AI score history (sample data)
           </h2>
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-6">
-            <RatingHistoryChart points={DEMO_RATING_HISTORY} isPro={isPro} />
+            <RatingHistoryChart
+              points={DEMO_RATING_HISTORY}
+              isPro={isPro}
+              symbol={symbol}
+            />
           </div>
         </section>
 

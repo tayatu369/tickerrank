@@ -54,6 +54,12 @@ export function HomeAuthNav() {
             >
               Dashboard
             </Link>
+            <Link
+              href="/portfolio"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3B82F6]"
+            >
+              Portfolio
+            </Link>
             <UserButton appearance={userButtonAppearance} />
           </>
         ) : (

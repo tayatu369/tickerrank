@@ -8,18 +8,28 @@ import { SiteHeader } from "../components/site-header";
 
 const FREE_FEATURES = [
   "3 ratings per day",
+  "Single stock only — no portfolio analysis",
   "Rating badge (A+ to F)",
   "Basic rating history chart (last 6 months)",
   "1 AI reason",
   "3 core metrics",
 ] as const;
 
-const PRO_FEATURES = [
+const PRO_FEATURES_CORE = [
   "Unlimited ratings",
   "Full rating history (unlimited)",
   "5 AI reasons",
   "All 5 metrics (Growth, Financial Health, Momentum, Value, Sentiment)",
   "News sentiment analysis",
+] as const;
+
+const PRO_FEATURES_PORTFOLIO = [
+  "Portfolio Health Score",
+  "Risk Assessment",
+  "AI-generated portfolio tips",
+] as const;
+
+const PRO_FEATURES_TAIL = [
   "Buffett Lens (valuation perspective)",
   "Weekly email report",
 ] as const;
@@ -102,7 +112,9 @@ export default function PricingPage() {
             Simple pricing
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-base text-slate-400 sm:text-lg">
-            Start free or unlock Pro for unlimited ratings and deeper AI insight.
+            Start free or unlock Pro for unlimited ratings, full{" "}
+            <span className="text-slate-300">Portfolio Rating</span>, and deeper
+            AI insight.
           </p>
         </div>
 
@@ -170,7 +182,28 @@ export default function PricingPage() {
               </span>
             </p>
             <ul className="mt-8 flex-1 space-y-3 text-sm text-slate-300">
-              {PRO_FEATURES.map((line) => (
+              {PRO_FEATURES_CORE.map((line) => (
+                <li key={line} className="flex gap-3">
+                  <span className="shrink-0 text-[#3B82F6]" aria-hidden>
+                    ✓
+                  </span>
+                  <span>{line}</span>
+                </li>
+              ))}
+              <li className="list-none pt-5">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Portfolio Rating
+                </h3>
+              </li>
+              {PRO_FEATURES_PORTFOLIO.map((line) => (
+                <li key={line} className="flex gap-3">
+                  <span className="shrink-0 text-[#3B82F6]" aria-hidden>
+                    ✓
+                  </span>
+                  <span>{line}</span>
+                </li>
+              ))}
+              {PRO_FEATURES_TAIL.map((line) => (
                 <li key={line} className="flex gap-3">
                   <span className="shrink-0 text-[#3B82F6]" aria-hidden>
                     ✓

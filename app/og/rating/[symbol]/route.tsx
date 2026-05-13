@@ -1,6 +1,5 @@
-import { kvGetSafe } from "@/lib/kv-safe";
 import {
-  utcDateKey,
+  getOrGenerateDailyCachedRating,
   validateSymbol,
 } from "@/lib/rating/daily-cached-rating";
 import { ImageResponse } from "next/og";
@@ -38,30 +37,6 @@ export async function GET(
     return new Response("Invalid symbol", { status: 400 });
   }
 
-  const cacheDate = utcDateKey(new Date());
-  const cacheKey = `rating:${symbol}:${cacheDate}`;
-  let cached: Record<string, unknown> | null = null;
-  try {
-    const rawCached = await kvGetSafe<unknown>(cacheKey);
-    if (rawCached && typeof rawCached === "object" && !Array.isArray(rawCached)) {
-      cached = rawCached as Record<string, unknown>;
-    }
-  } catch {
-    cached = null;
-  }
-
-  if (!cached) {
-    return new Response("No cached rating for today", { status: 404 });
-  }
-
-  const rating =
-    cached.rating != null ? String(cached.rating).trim() : "";
-  if (!rating) {
-    return new Response("No cached rating for today", { status: 404 });
-  }
-
-  const reason1 = shorten(reason1FromCached(cached), 80);
-
   const { origin } = new URL(request.url);
   let iconSrc: string | undefined;
   try {
@@ -73,6 +48,113 @@ export async function GET(
   } catch {
     iconSrc = undefined;
   }
+
+  const result = await getOrGenerateDailyCachedRating(symbol);
+  const body = result.ok ? result.responseBody : null;
+  const rating =
+    body && body.rating != null ? String(body.rating).trim() : "";
+  const useFallback = !result.ok || !rating;
+
+  if (useFallback) {
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            background: BG,
+            padding: 72,
+            position: "relative",
+            fontFamily:
+              "ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%) rotate(-18deg)",
+              fontSize: 280,
+              fontWeight: 900,
+              color: "rgba(148, 163, 184, 0.16)",
+              letterSpacing: "-0.06em",
+            }}
+          >
+            NFA
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 24,
+              position: "relative",
+            }}
+          >
+            {iconSrc ? (
+              <img alt="" src={iconSrc} width={88} height={88} />
+            ) : (
+              <div
+                style={{
+                  width: 88,
+                  height: 88,
+                  borderRadius: 22,
+                  background: BG,
+                  border: `3px solid ${ACCENT}`,
+                }}
+              />
+            )}
+            <span
+              style={{
+                color: "#94A3B8",
+                fontSize: 34,
+                fontWeight: 600,
+              }}
+            >
+              TickerRank
+            </span>
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "flex-start",
+              gap: 20,
+              position: "relative",
+              paddingTop: 20,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 72,
+                fontWeight: 700,
+                color: "#94A3B8",
+                letterSpacing: "-0.02em",
+                lineHeight: 1.2,
+                maxWidth: 900,
+              }}
+            >
+              Rating unavailable
+            </div>
+          </div>
+        </div>
+      ),
+      {
+        width: 1080,
+        height: 1080,
+        status: 404,
+      },
+    );
+  }
+
+  const cached = body as Record<string, unknown>;
+  const reason1 = shorten(reason1FromCached(cached), 80);
 
   return new ImageResponse(
     (
