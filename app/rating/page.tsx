@@ -7,8 +7,11 @@ import { useSearchParams } from "next/navigation";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { SiteFooter } from "../components/site-footer";
 import { SiteHeader } from "../components/site-header";
+import {
+  RatingHistoryChart,
+  type RatingHistoryPoint,
+} from "@/components/RatingHistoryChart";
 import { recordRecentSymbol } from "@/lib/recent-queries";
-import { RatingHistoryChart } from "./rating-history-chart";
 
 type RatingApiResponse = {
   symbol: string;
@@ -32,6 +35,64 @@ type RatingApiResponse = {
   };
   cached?: boolean;
 };
+
+/** Placeholder history until a ratings time-series API exists. */
+const DEMO_RATING_HISTORY: RatingHistoryPoint[] = [
+  {
+    date: "2024-09-02",
+    score: 61,
+    rating: "C+",
+    reasons: ["Growth trailing peers.", "Margins stable but thin."],
+  },
+  {
+    date: "2024-09-30",
+    score: 64,
+    rating: "B-",
+    reasons: ["Revenue inflected higher.", "FCF still uneven."],
+  },
+  {
+    date: "2024-10-28",
+    score: 67,
+    rating: "B-",
+    reasons: ["Sentiment improved on guidance.", "Valuation less stretched."],
+  },
+  {
+    date: "2024-11-25",
+    score: 65,
+    rating: "B-",
+    reasons: ["Profit-taking pressure.", "Core metrics little changed."],
+  },
+  {
+    date: "2024-12-23",
+    score: 70,
+    rating: "B",
+    reasons: ["Margin expansion quarter.", "Balance sheet de-risked."],
+  },
+  {
+    date: "2025-01-20",
+    score: 72,
+    rating: "B",
+    reasons: ["Momentum building in estimates.", "Capex discipline noted."],
+  },
+  {
+    date: "2025-02-17",
+    score: 71,
+    rating: "B",
+    reasons: ["Macro noise clipped upside.", "Health metrics still solid."],
+  },
+  {
+    date: "2025-03-17",
+    score: 74,
+    rating: "B+",
+    reasons: ["Earnings beat expectations.", "FCF conversion improved."],
+  },
+  {
+    date: "2025-04-14",
+    score: 76,
+    rating: "B+",
+    reasons: ["Analyst revisions skew positive.", "Technical trend supportive."],
+  },
+];
 
 function isFallbackRating(data: RatingApiResponse): boolean {
   const reasonsMentionPlaceholder = data.reasons.some((r) =>
@@ -812,10 +873,10 @@ function RatingDetails({
             id="trend-heading"
             className="text-sm font-semibold uppercase tracking-wider text-slate-400"
           >
-            Trend (sample data)
+            AI score history (sample data)
           </h2>
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-6">
-            <RatingHistoryChart />
+            <RatingHistoryChart points={DEMO_RATING_HISTORY} isPro={isPro} />
           </div>
         </section>
 
