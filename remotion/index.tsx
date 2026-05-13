@@ -1,5 +1,6 @@
 import { Composition, registerRoot } from "remotion";
 import {
+  getTotalCompositionFrames,
   StockRatingVideo,
   type StockRatingVideoProps,
 } from "./StockRatingVideo";
@@ -16,6 +17,7 @@ const defaultProps: StockRatingVideoProps = {
   screenshotUrl:
     "https://placehold.co/1080x1920/0B1120/3B82F6/png?text=Screenshot+preview",
   audioUrl: "",
+  templateIndex: 0,
 };
 
 registerRoot(() => (
@@ -24,10 +26,16 @@ registerRoot(() => (
       id="StockRatingVideo"
       component={StockRatingVideo}
       fps={30}
-      durationInFrames={1020} /* MAIN (900 frames) + 2s branding @ fps 30 on each end */
       width={1080}
       height={1920}
       defaultProps={defaultProps}
+      calculateMetadata={({ props }) => {
+        const fps = 30;
+        const ti = Math.min(9, Math.max(0, Math.floor(Number(props.templateIndex) || 0)));
+        return {
+          durationInFrames: getTotalCompositionFrames(ti, fps),
+        };
+      }}
     />
   </>
 ));

@@ -37,6 +37,23 @@ const NETWORK_IDLE_NAV = Object.freeze({
 /** Update this list weekly based on market volatility for better video engagement. */
 const POPULAR_STOCKS = ["TSLA", "PLTR", "MARA", "AAPL", "GME"];
 
+let previousTemplateIndex = null;
+
+/**
+ * Random template index in 0–9; never repeats the immediately previous symbol’s index.
+ * Main story length by index (see `remotion/StockRatingVideo.tsx`): 0 and 5 → 35s, odd → 25s, other evens → 30s.
+ * Full `durationInFrames` (main + 2s bookends each end @ 30fps) is set by Remotion `calculateMetadata` from `inputProps.templateIndex`.
+ */
+function getRandomTemplateIndex() {
+  const choices =
+    previousTemplateIndex === null
+      ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+      : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter((i) => i !== previousTemplateIndex);
+  const pick = choices[Math.floor(Math.random() * choices.length)];
+  previousTemplateIndex = pick;
+  return pick;
+}
+
 /** Same rules as scripts/generate-voiceover.mjs / lib/kv-safe.ts `resolveRestUrlToken`. */
 function trimEnv(name) {
   const v = process.env[name];
@@ -658,6 +675,8 @@ async function main() {
         continue;
       }
 
+      const templateIndex = getRandomTemplateIndex();
+
       const inputProps = {
         stock: symbol,
         rating: payload.rating,
@@ -667,6 +686,7 @@ async function main() {
         reason2: payload.reason2 || "—",
         screenshotUrl,
         audioUrl,
+        templateIndex,
       };
 
       try {

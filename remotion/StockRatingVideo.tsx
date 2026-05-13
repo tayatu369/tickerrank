@@ -8,8 +8,100 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+import type { CSSProperties } from "react";
 
 export type RatingLabel = "Bullish" | "Bearish" | "Neutral";
+
+export type HookMood =
+  | "shock"
+  | "surprise"
+  | "contrarian"
+  | "caution"
+  | "highlight";
+
+export type HookStyle = "bigText" | "question" | "statistic";
+
+export type HookTemplate = {
+  hookText: string;
+  mood: HookMood;
+  textColor: string;
+  introDuration: number;
+  style: HookStyle;
+};
+
+/** 10 scripted hook variants for short-form videos. */
+export const HOOK_TEMPLATES: HookTemplate[] = [
+  {
+    hookText: "Tesla TSLA just got rated F by AI… this is insane!",
+    mood: "shock",
+    textColor: "#EF4444",
+    introDuration: 90,
+    style: "bigText",
+  },
+  {
+    hookText: "Nvidia NVDA gets a C-! 99% of investors are missing this.",
+    mood: "surprise",
+    textColor: "#EAB308",
+    introDuration: 90,
+    style: "statistic",
+  },
+  {
+    hookText: "Apple AAPL rated B+ – you won’t believe why.",
+    mood: "surprise",
+    textColor: "#FDE047",
+    introDuration: 90,
+    style: "question",
+  },
+  {
+    hookText: "Top trending stock AMZN got a D! Shocking for many investors.",
+    mood: "caution",
+    textColor: "#FBBF24",
+    introDuration: 90,
+    style: "bigText",
+  },
+  {
+    hookText: "MSFT receives a B rating – surprising twist!",
+    mood: "surprise",
+    textColor: "#FACC15",
+    introDuration: 90,
+    style: "bigText",
+  },
+  {
+    hookText: "Everyone is bullish on META, AI says C+ – watch this.",
+    mood: "contrarian",
+    textColor: "#FB923C",
+    introDuration: 105,
+    style: "bigText",
+  },
+  {
+    hookText: "SPY ETF scored A- by AI – here’s why it matters.",
+    mood: "highlight",
+    textColor: "#93C5FD",
+    introDuration: 90,
+    style: "statistic",
+  },
+  {
+    hookText: "NIO gets a F rating – shocking for EV enthusiasts!",
+    mood: "shock",
+    textColor: "#F87171",
+    introDuration: 90,
+    style: "bigText",
+  },
+  {
+    hookText: "QQQ just got a B rating – surprising trend revealed.",
+    mood: "surprise",
+    textColor: "#FDE047",
+    introDuration: 90,
+    style: "bigText",
+  },
+  {
+    hookText: "NFLX F rating – streaming giant not what it seems.",
+    mood: "contrarian",
+    textColor: "#F472B6",
+    introDuration: 105,
+    style: "question",
+  },
+];
 
 export type StockRatingVideoProps = {
   stock: string;
@@ -20,45 +112,115 @@ export type StockRatingVideoProps = {
   reason2: string;
   screenshotUrl: string;
   audioUrl: string;
+  /** Picks hook copy & mood (0–9). */
+  templateIndex?: number;
 };
 
 const NAVY = "#0B1120";
 const ACCENT = "#3B82F6";
 
-/**
- * Main storyline length (excluding bookend branding). Matches prior 900-frame @ 30fps video.
- */
-const MAIN_DURATION_FRAMES = 900;
+/** Seconds of main story (between open/close branding). */
+export function getMainStorySecondsForTemplate(templateIndex: number): number {
+  const ti = ((templateIndex % 10) + 10) % 10;
+  if (ti === 0 || ti === 5) return 35;
+  if (ti % 2 === 1) return 25;
+  return 30;
+}
 
-/** 2-second bookends (@ current composition fps via hooks where needed). */
-const BRANDING_SECONDS = 2;
+export function getMainStoryFramesForTemplate(
+  templateIndex: number,
+  fps: number,
+): number {
+  return Math.round(getMainStorySecondsForTemplate(templateIndex) * fps);
+}
 
-const INTRO_FRAMES = 45; /* relative to MAIN timeline — 0–1.5s */
-const LOADING_END = 90; /* relative to MAIN — ~3s mark */
-const REASON_END = 750; /* relative to MAIN */
+/** Bookend length on each end (seconds). */
+export const BRANDING_SECONDS_BOOKEND = 2;
 
-/** Vertical scroll through reasons: ~10s at composition fps (smooth ease). */
+export function getBrandingFramesTotal(fps: number): number {
+  return Math.round(BRANDING_SECONDS_BOOKEND * fps) * 2;
+}
+
+export function getTotalCompositionFrames(
+  templateIndex: number,
+  fps: number,
+): number {
+  return getMainStoryFramesForTemplate(templateIndex, fps) + getBrandingFramesTotal(fps);
+}
+
 const REASON_SCROLL_SECONDS = 10;
 
 const REASON_TEXT_SHADOW =
   "0 1px 2px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.85), 0 4px 28px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,1)";
 
-/** Map absolute composition frame → main story frame (frozen while opening/outro overlays). */
-function useMainTimelineFrame() {
+type MainTimeline = {
+  hookEnd: number;
+  badgeEnd: number;
+  loadingEnd: number;
+  reasonEnd: number;
+  reasonScrollFrames: number;
+};
+
+function buildMainTimeline(
+  mainDurationFrames: number,
+  hookFrames: number,
+  fps: number,
+): MainTimeline {
+  const badgeDur = Math.min(78, Math.max(48, Math.round(mainDurationFrames * 0.09)));
+  const loadDur = Math.min(52, Math.max(36, Math.round(mainDurationFrames * 0.06)));
+  const ctaReserve = Math.min(156, Math.max(96, Math.round(mainDurationFrames * 0.17)));
+
+  let h = Math.min(hookFrames, Math.floor(mainDurationFrames * 0.22));
+  h = Math.max(60, h);
+
+  let hookEnd = h;
+  let badgeEnd = hookEnd + badgeDur;
+  let loadingEnd = badgeEnd + loadDur;
+  const reasonEnd = Math.max(loadingEnd + fps * 4, mainDurationFrames - ctaReserve);
+
+  let reasonScrollFrames = Math.max(
+    Math.round(REASON_SCROLL_SECONDS * fps),
+    reasonEnd - loadingEnd,
+  );
+  if (loadingEnd + reasonScrollFrames > reasonEnd) {
+    reasonScrollFrames = Math.max(fps * 3, reasonEnd - loadingEnd);
+  }
+  if (loadingEnd >= reasonEnd - 8) {
+    const shrink = loadingEnd - (reasonEnd - 8 - loadDur);
+    if (shrink > 0) {
+      loadingEnd = badgeEnd + Math.max(24, loadDur - shrink);
+    }
+    if (loadingEnd >= reasonEnd - 8) {
+      hookEnd = Math.max(48, hookEnd - (loadingEnd - (reasonEnd - 8)));
+      badgeEnd = hookEnd + badgeDur;
+      loadingEnd = badgeEnd + Math.max(24, loadDur);
+    }
+  }
+
+  return {
+    hookEnd,
+    badgeEnd,
+    loadingEnd,
+    reasonEnd,
+    reasonScrollFrames,
+  };
+}
+
+/** Map absolute composition frame → main story frame (frozen on bookends). */
+function useMainTimelineFrame(mainDurationFrames: number): number {
   const frame = useCurrentFrame();
   const { durationInFrames, fps } = useVideoConfig();
-  const open = Math.round(BRANDING_SECONDS * fps);
-  const close = Math.round(BRANDING_SECONDS * fps);
+  const open = Math.round(BRANDING_SECONDS_BOOKEND * fps);
+  const close = Math.round(BRANDING_SECONDS_BOOKEND * fps);
   const closingStart = durationInFrames - close;
   if (frame < open) return 0;
-  if (frame >= closingStart) return MAIN_DURATION_FRAMES - 1;
+  if (frame >= closingStart) return mainDurationFrames - 1;
 
   const inner = frame - open;
-  return Math.min(inner, MAIN_DURATION_FRAMES - 1);
+  return Math.min(inner, mainDurationFrames - 1);
 }
 
 function ParticleField({ phaseFrame }: { phaseFrame: number }) {
-  /** Deterministic sparkle grid — no external RNG. */
   const dots = [
     ...Array.from({ length: 56 }, (_, i) => {
       const gx = ((i * 47) % 11) / 11;
@@ -134,7 +296,7 @@ function BrandedBackdrop({ pulseFrame }: { pulseFrame: number }) {
 function BrandOpening({ stock }: { stock: string }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const dur = Math.round(BRANDING_SECONDS * fps);
+  const dur = Math.round(BRANDING_SECONDS_BOOKEND * fps);
 
   const shellOpacity = interpolate(frame, [dur - 16, dur - 3], [1, 0], {
     extrapolateLeft: "clamp",
@@ -237,7 +399,7 @@ function BrandOpening({ stock }: { stock: string }) {
 function BrandClosing() {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const dur = Math.round(BRANDING_SECONDS * fps);
+  const dur = Math.round(BRANDING_SECONDS_BOOKEND * fps);
 
   const fadeInBg = interpolate(frame, [0, 18], [0, 1], {
     extrapolateLeft: "clamp",
@@ -314,50 +476,6 @@ function ratingBadgeTone(rating: string): string {
   return "#EF4444";
 }
 
-const INTRO_STRONG_RATINGS = new Set(["A+", "A", "A-"]);
-const INTRO_NEUTRAL_RATINGS = new Set(["B+", "B", "B-"]);
-const INTRO_WEAK_RATINGS = new Set([
-  "C+",
-  "C",
-  "C-",
-  "D+",
-  "D",
-  "D-",
-  "F",
-]);
-
-function ratingIntroTier(rating: string): "strong" | "neutral" | "weak" {
-  const r = rating.trim().toUpperCase();
-  if (INTRO_STRONG_RATINGS.has(r)) return "strong";
-  if (INTRO_NEUTRAL_RATINGS.has(r)) return "neutral";
-  if (INTRO_WEAK_RATINGS.has(r)) return "weak";
-  if (r.startsWith("A")) return "strong";
-  if (r.startsWith("B")) return "neutral";
-  if (r.startsWith("C") || r.startsWith("D") || r.startsWith("F")) return "weak";
-  return "neutral";
-}
-
-function introHeadlineText(stock: string, rating: string): string {
-  const s = stock.trim();
-  const R = rating.trim();
-  switch (ratingIntroTier(rating)) {
-    case "strong":
-      return `${s} gets ${R} from TickerRank AI — market leader or bubble?`;
-    case "weak":
-      return `AI gives ${s} a ${R} — are investors ignoring the risks?`;
-    default:
-      return `${s} rated ${R} — hidden opportunity or stagnation?`;
-  }
-}
-
-/** Subtle emoji accent for letter extremes only (shock / question vibe). */
-function extremeIntroEmoji(rating: string): { emoji: string; kind: "high" | "low" } | null {
-  const r = rating.trim().toUpperCase();
-  if (r === "A+" || r === "A") return { emoji: "⚡", kind: "high" };
-  if (r === "F" || r === "D-" || r === "D") return { emoji: "⁉️", kind: "low" };
-  return null;
-}
-
 function labelBadgeStyle(label: RatingLabel): {
   bg: string;
   color: string;
@@ -413,25 +531,192 @@ function NfaWatermark() {
   );
 }
 
-function IntroOverlay({
-  stock,
+function HookPhaseOverlay({
+  template,
+  mainFrame,
+  opacity,
+}: {
+  template: HookTemplate;
+  mainFrame: number;
+  opacity: number;
+}) {
+  const shake =
+    template.mood === "shock"
+      ? Math.sin(mainFrame * 0.92) * 10 + Math.cos(mainFrame * 0.71) * 4
+      : 0;
+
+  const popScale = interpolate(
+    mainFrame,
+    [0, 14],
+    [0.88, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
+  );
+
+  let bg = NAVY;
+  if (template.mood === "shock") bg = "#450a0a";
+  if (template.mood === "caution") bg = "#422006";
+
+  const fontFam =
+    'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+
+  const baseFont =
+    template.style === "bigText"
+      ? 58
+      : template.style === "statistic"
+        ? 54
+        : 52;
+  const fontStyle: CSSProperties =
+    template.style === "question" ? { fontStyle: "italic" } : {};
+
+  const textBlock = (
+    <div
+      style={{
+        textAlign: "center",
+        padding: "0 48px",
+        maxWidth: 1000,
+        transform:
+          template.mood === "shock"
+            ? `translateX(${shake}px)`
+            : `scale(${popScale})`,
+        fontFamily: fontFam,
+        fontWeight: 900,
+        fontSize: baseFont,
+        lineHeight: 1.28,
+        color: template.textColor,
+        letterSpacing: template.style === "statistic" ? "-0.02em" : "-0.025em",
+        textShadow:
+          template.mood === "shock"
+            ? "0 4px 32px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,1)"
+            : "0 2px 24px rgba(0,0,0,0.65)",
+        ...fontStyle,
+      }}
+    >
+      {template.hookText}
+    </div>
+  );
+
+  if (template.mood === "contrarian") {
+    return (
+      <AbsoluteFill
+        style={{
+          opacity,
+          backgroundColor: NAVY,
+          zIndex: 26,
+          display: "flex",
+          flexDirection: "row",
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            borderRight: "3px solid rgba(59,130,246,0.35)",
+            background: "linear-gradient(145deg,#14532d40,#0B1120)",
+            padding: 32,
+          }}
+        >
+          <span style={{ fontSize: 88, lineHeight: 1 }} aria-hidden>
+            🐂
+          </span>
+          <span
+            style={{
+              marginTop: 16,
+              fontFamily: fontFam,
+              fontSize: 32,
+              fontWeight: 800,
+              color: "#86EFAC",
+            }}
+          >
+            Crowd bullish
+          </span>
+        </div>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            background: "linear-gradient(215deg,#3f0f1844,#0B1120)",
+            padding: 32,
+          }}
+        >
+          <span style={{ fontSize: 76, lineHeight: 1 }} aria-hidden>
+            🤖📉
+          </span>
+          <div style={{ marginTop: 28, padding: "0 12px" }}>{textBlock}</div>
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
+  if (template.mood === "surprise") {
+    return (
+      <AbsoluteFill
+        style={{ opacity, zIndex: 26, justifyContent: "center", alignItems: "center" }}
+      >
+        <div
+          style={{
+            transform: `scale(${popScale}) rotate(-0.8deg)`,
+            borderRadius: 28,
+            border: "6px solid #EAB308",
+            backgroundColor: "#1e1b0a",
+            boxShadow:
+              "0 0 0 4px rgba(250,204,21,0.35), 0 32px 100px rgba(0,0,0,0.55)",
+            padding: "52px 40px",
+            maxWidth: 980,
+          }}
+        >
+          {textBlock}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
+  return (
+    <AbsoluteFill
+      style={{
+        opacity,
+        backgroundColor: bg,
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 26,
+      }}
+    >
+      <BrandedBackdrop pulseFrame={mainFrame + 120} />
+      <AbsoluteFill
+        style={{
+          justifyContent: "center",
+          alignItems: "center",
+          background:
+            template.mood === "highlight"
+              ? "radial-gradient(ellipse at center,rgba(59,130,246,0.2) 0%,transparent 55%)"
+              : undefined,
+          border:
+            template.mood === "highlight"
+              ? "3px solid rgba(59,130,246,0.45)"
+              : undefined,
+        }}
+      >
+        {textBlock}
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+}
+
+function BadgeIntroOverlay({
   rating,
   label,
   score,
   opacity,
-}: Pick<StockRatingVideoProps, "stock" | "rating" | "label" | "score"> & {
+}: Pick<StockRatingVideoProps, "rating" | "label" | "score"> & {
   opacity: number;
 }) {
-  const mainFrame = useMainTimelineFrame();
   const badge = ratingBadgeTone(rating);
   const lb = labelBadgeStyle(label);
-  const headline = introHeadlineText(stock, rating);
-  const extreme = extremeIntroEmoji(rating);
-  const emojiWobble =
-    extreme != null
-      ? 0.06 * Math.sin((mainFrame / 30) * Math.PI * 2 * 2.2)
-      : 0;
-  const emojiScale = extreme != null ? 1 + emojiWobble : 1;
 
   return (
     <AbsoluteFill
@@ -440,17 +725,10 @@ function IntroOverlay({
         backgroundColor: NAVY,
         justifyContent: "center",
         alignItems: "center",
-        zIndex: 12,
+        zIndex: 14,
       }}
     >
-      <div
-        style={{
-          textAlign: "center",
-          padding: 48,
-          maxWidth: 1100,
-          margin: "0 auto",
-        }}
-      >
+      <div style={{ textAlign: "center", padding: 48, maxWidth: 1100 }}>
         <div
           style={{
             width: 280,
@@ -476,43 +754,6 @@ function IntroOverlay({
           >
             {rating}
           </span>
-        </div>
-        <div
-          style={{
-            fontFamily:
-              'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-            fontSize: 62,
-            fontWeight: 900,
-            color: "#F8FAFC",
-            lineHeight: 1.22,
-            marginBottom: 28,
-            letterSpacing: "-0.02em",
-            textShadow:
-              "0 2px 28px rgba(0,0,0,0.5), 0 0 1px rgba(248,250,252,0.2)",
-          }}
-        >
-          {headline}
-          {extreme ? (
-            <span
-              aria-hidden
-              style={{
-                display: "inline-block",
-                marginLeft: 10,
-                fontSize: 50,
-                lineHeight: 1,
-                verticalAlign: "middle",
-                transform: `scale(${emojiScale}) translateY(${emojiWobble * 6}px)`,
-                filter:
-                  extreme.kind === "high"
-                    ? "drop-shadow(0 0 14px rgba(250,204,21,0.45))"
-                    : "drop-shadow(0 0 12px rgba(248,113,113,0.4))",
-                opacity: 0.88 + emojiWobble * 0.25,
-                willChange: "transform, opacity",
-              }}
-            >
-              {extreme.emoji}
-            </span>
-          ) : null}
         </div>
         <div
           style={{
@@ -570,13 +811,20 @@ function ScreenshotBackdrop({
 function LoadingSegment({
   stock,
   opacity,
+  loadingStartFrame,
+  loadingEndFrame,
+  mainDurationFrames,
 }: {
   stock: string;
   opacity: number;
+  loadingStartFrame: number;
+  loadingEndFrame: number;
+  mainDurationFrames: number;
 }) {
-  const frame = useMainTimelineFrame();
-  const rel = Math.max(0, frame - INTRO_FRAMES);
-  const progress = interpolate(rel, [0, LOADING_END - INTRO_FRAMES], [0, 100], {
+  const mainFrame = useMainTimelineFrame(mainDurationFrames);
+  const rel = Math.max(0, mainFrame - loadingStartFrame);
+  const span = Math.max(1, loadingEndFrame - loadingStartFrame);
+  const progress = interpolate(rel, [0, span], [0, 100], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -637,13 +885,24 @@ function ScrollingReasons({
   reason1,
   reason2,
   opacity,
-}: Pick<StockRatingVideoProps, "reason1" | "reason2"> & { opacity: number }) {
-  const frame = useMainTimelineFrame();
-  const { height, fps } = useVideoConfig();
-  const scrollSpan = Math.max(1, Math.round(REASON_SCROLL_SECONDS * fps));
-  /** Inclusive span: frames LOADING_END .. LOADING_END+scrollSpan-1 == scrollSpan frames (~10s @ 30fps). */
-  const scrollEndFrame = LOADING_END + scrollSpan - 1;
-  const t = interpolate(frame, [LOADING_END, scrollEndFrame], [0, 1], {
+  loadingEndFrame,
+  reasonEndFrame,
+  reasonScrollFrames,
+  mainDurationFrames,
+}: Pick<StockRatingVideoProps, "reason1" | "reason2"> & {
+  opacity: number;
+  loadingEndFrame: number;
+  reasonEndFrame: number;
+  reasonScrollFrames: number;
+  mainDurationFrames: number;
+}) {
+  const mainFrame = useMainTimelineFrame(mainDurationFrames);
+  const { height } = useVideoConfig();
+  const scrollEndFrame = Math.min(
+    loadingEndFrame + reasonScrollFrames - 1,
+    Math.max(loadingEndFrame + 1, reasonEndFrame - 1),
+  );
+  const t = interpolate(mainFrame, [loadingEndFrame, scrollEndFrame], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.inOut(Easing.ease),
@@ -724,12 +983,28 @@ function ScrollingReasons({
   );
 }
 
-/** Thin timeline synced to full composition duration — anchors pacing for viewers. */
-function VideoProgressIndicator() {
+function VideoProgressIndicator({
+  mainDurationFrames,
+}: {
+  mainDurationFrames: number;
+}) {
   const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
-  const denom = Math.max(1, durationInFrames - 1);
-  const progress = interpolate(frame, [0, denom], [0, 1], {
+  const { durationInFrames, fps } = useVideoConfig();
+  const open = Math.round(BRANDING_SECONDS_BOOKEND * fps);
+  const close = Math.round(BRANDING_SECONDS_BOOKEND * fps);
+  const closingStart = durationInFrames - close;
+  const mainFrameRel = interpolate(
+    frame,
+    [open, closingStart - 1],
+    [0, Math.max(0, mainDurationFrames - 1)],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    },
+  );
+
+  const denom = Math.max(1, mainDurationFrames - 1);
+  const progress = interpolate(mainFrameRel, [0, denom], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -815,6 +1090,54 @@ function CtaFrame({ opacity }: { opacity: number }) {
   );
 }
 
+function EngagementHint({
+  opacity,
+  reasonEndFrame,
+  mainDurationFrames,
+}: {
+  opacity: number;
+  reasonEndFrame: number;
+  mainDurationFrames: number;
+}) {
+  const frame = useMainTimelineFrame(mainDurationFrames);
+  const start = Math.max(0, reasonEndFrame - 120);
+  const local = interpolate(
+    frame,
+    [start - 1, start + 24, reasonEndFrame - 8, reasonEndFrame],
+    [0, 0.88, 0.88, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  const fontFam =
+    'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+
+  return (
+    <AbsoluteFill
+      style={{
+        pointerEvents: "none",
+        justifyContent: "flex-end",
+        alignItems: "center",
+        paddingBottom: 180,
+        zIndex: 18,
+        opacity: opacity * local,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: fontFam,
+          fontSize: 28,
+          fontWeight: 600,
+          color: "rgba(248,250,252,0.78)",
+          textShadow:
+            "0 2px 16px rgba(0,0,0,0.85), 0 0 1px rgba(0,0,0,0.9)",
+        }}
+      >
+        💬 Comment your thoughts
+      </div>
+    </AbsoluteFill>
+  );
+}
+
 export function StockRatingVideo({
   stock,
   rating,
@@ -824,66 +1147,123 @@ export function StockRatingVideo({
   reason2,
   screenshotUrl,
   audioUrl,
+  templateIndex = 0,
 }: StockRatingVideoProps) {
-  const frame = useMainTimelineFrame();
+  const templateIdx = Math.min(9, Math.max(0, Math.floor(Number(templateIndex) || 0)));
+  const template = HOOK_TEMPLATES[templateIdx]!;
   const { durationInFrames, fps } = useVideoConfig();
 
-  const brandingFrames = Math.round(BRANDING_SECONDS * fps);
+  const brandingFrames = Math.round(BRANDING_SECONDS_BOOKEND * fps);
   const closingStart = durationInFrames - brandingFrames;
 
-  const shotOpacity = interpolate(frame, [40, 88], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const mainDurationFrames =
+    durationInFrames - brandingFrames * 2;
+  const timeline = buildMainTimeline(
+    mainDurationFrames,
+    template.introDuration,
+    fps,
+  );
 
-  const introOpacity = interpolate(frame, [43, 60], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const mf = useMainTimelineFrame(mainDurationFrames);
+
+  const hookOpacity = interpolate(
+    mf,
+    [0, Math.max(0, timeline.hookEnd - 16), timeline.hookEnd],
+    [1, 1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  const badgeOpacity = interpolate(
+    mf,
+    [
+      Math.max(0, timeline.hookEnd - 10),
+      timeline.hookEnd + 6,
+      Math.max(timeline.badgeEnd - 14, timeline.hookEnd + 12),
+      timeline.badgeEnd + 10,
+    ],
+    [0, 1, 1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  const shotOpacity = interpolate(
+    mf,
+    [timeline.hookEnd + 12, timeline.badgeEnd + 48],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
 
   const loadingOpacity = interpolate(
-    frame,
-    [INTRO_FRAMES - 1, INTRO_FRAMES + 2, LOADING_END - 10, LOADING_END],
+    mf,
+    [
+      timeline.badgeEnd - 2,
+      timeline.badgeEnd + 8,
+      timeline.loadingEnd - 12,
+      timeline.loadingEnd + 4,
+    ],
     [0, 1, 1, 0],
-    {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    },
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
   const reasonsOpacity = interpolate(
-    frame,
-    [LOADING_END - 2, LOADING_END + 8, REASON_END - 10, REASON_END],
+    mf,
+    [
+      timeline.loadingEnd - 4,
+      timeline.loadingEnd + 12,
+      timeline.reasonEnd - 16,
+      timeline.reasonEnd + 4,
+    ],
     [0, 1, 1, 0],
-    {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    },
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
-  const ctaOpacity = interpolate(frame, [REASON_END - 6, REASON_END + 8], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const engagementOpacity = reasonsOpacity;
+
+  const ctaOpacity = interpolate(
+    mf,
+    [timeline.reasonEnd - 8, timeline.reasonEnd + 10],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
 
   return (
     <AbsoluteFill style={{ backgroundColor: NAVY }}>
       <ScreenshotBackdrop screenshotUrl={screenshotUrl} opacity={shotOpacity} />
 
-      <IntroOverlay
-        stock={stock}
+      <HookPhaseOverlay
+        template={template}
+        mainFrame={mf}
+        opacity={hookOpacity}
+      />
+
+      <BadgeIntroOverlay
         rating={rating}
         label={label}
         score={score}
-        opacity={introOpacity}
+        opacity={badgeOpacity}
       />
 
-      <LoadingSegment stock={stock} opacity={loadingOpacity} />
+      <LoadingSegment
+        stock={stock}
+        opacity={loadingOpacity}
+        loadingStartFrame={timeline.badgeEnd}
+        loadingEndFrame={timeline.loadingEnd}
+        mainDurationFrames={mainDurationFrames}
+      />
 
       <ScrollingReasons
         reason1={reason1}
         reason2={reason2}
         opacity={reasonsOpacity}
+        loadingEndFrame={timeline.loadingEnd}
+        reasonEndFrame={timeline.reasonEnd}
+        reasonScrollFrames={timeline.reasonScrollFrames}
+        mainDurationFrames={mainDurationFrames}
+      />
+
+      <EngagementHint
+        opacity={engagementOpacity}
+        reasonEndFrame={timeline.reasonEnd}
+        mainDurationFrames={mainDurationFrames}
       />
 
       <CtaFrame opacity={ctaOpacity} />
@@ -896,13 +1276,13 @@ export function StockRatingVideo({
         <BrandClosing />
       </Sequence>
 
-      <VideoProgressIndicator />
+      <VideoProgressIndicator mainDurationFrames={mainDurationFrames} />
 
       <NfaWatermark />
 
       {audioUrl ? (
         <Sequence
-          durationInFrames={MAIN_DURATION_FRAMES}
+          durationInFrames={mainDurationFrames}
           from={brandingFrames}
           layout="none"
         >
